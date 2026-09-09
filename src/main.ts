@@ -120,7 +120,6 @@ async function main(): Promise<void> {
   addButton('上面', () => setView('top'));
   addButton('正面', () => setView('front'));
   addButton('側面', () => setView('side'));
-  addButton('アイソメ', () => setView('perspective'));
 
   const projBtn = addButton('平行投影', () => {
     projection = projection === 'perspective' ? 'orthographic' : 'perspective';
