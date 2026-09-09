@@ -111,7 +111,7 @@ async function main(): Promise<void> {
   clipping.registerMaterials(collectMaterials(modelLoader.partRoots.values()));
 
   // --- UI 結線 --------------------------------------------------------------
-  const tree = new ModelTree(treeEl, layers);
+  const tree = new ModelTree(treeEl, layers, data.metadata);
   tree.render();
 
   const props = new PropertyPanel(propsEl);
