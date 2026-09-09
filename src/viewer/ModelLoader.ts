@@ -16,9 +16,22 @@ export class ModelLoader {
   /** part.id → 読み込んだルートオブジェクト（Layers/Selectionが参照） */
   readonly partRoots = new Map<string, THREE.Object3D>();
 
+  /** 輪郭線（EdgesGeometry）のクリース角しきい値（度）。 */
+  private static readonly EDGE_THRESHOLD_ANGLE = 20;
+  private edgeMaterial: THREE.LineBasicMaterial;
+
   constructor(renderer: THREE.WebGLRenderer) {
     this.loader = new GLTFLoader();
     this.loader.setMeshoptDecoder(MeshoptDecoder);
+
+    // part同士（例: 壁と床）が近い色でも境界が読み取れるよう、輪郭線を薄く重ねる。
+    // 全メッシュで共有し、Selection等のRaycasterには反応させない（後述 raycast no-op）。
+    this.edgeMaterial = new THREE.LineBasicMaterial({
+      color: 0x1a1a1a,
+      transparent: true,
+      opacity: 0.35,
+      depthTest: true,
+    });
 
     // デコーダは public/decoders/ に配置し、BASE_URL 起点で解決する。
     // 絶対パス '/decoders/...' はダメ: GitHub Pages の project page（/<repo>/ 配下配信）で
@@ -54,10 +67,29 @@ export class ModelLoader {
       // ノード名 = Object ID。Selection/metadata引き当てに使う（rhino-conventions.md）。
       scene.add(root);
       this.partRoots.set(part.id, root);
+      this.addSilhouetteEdges(root);
 
       overall.expandByObject(root);
       onPart?.(part, root);
     }
     return overall;
+  }
+
+  /**
+   * 各メッシュへ輪郭/クリース線（EdgesGeometry）を子として追加する。
+   * Selection.resolveObjectId は hitしたmeshからnode.parentを辿ってObject IDを
+   * 解決するため、輪郭線自体がヒットしてしまうと親IDの解決を阻害しうる。
+   * そのためLineSegments.raycastをno-opにして、Raycasterから常に除外する。
+   */
+  private addSilhouetteEdges(root: THREE.Object3D): void {
+    root.traverse((node) => {
+      if (!(node instanceof THREE.Mesh)) return;
+      const edgesGeometry = new THREE.EdgesGeometry(node.geometry, ModelLoader.EDGE_THRESHOLD_ANGLE);
+      const edges = new THREE.LineSegments(edgesGeometry, this.edgeMaterial);
+      edges.name = `${node.name}__edges`;
+      edges.raycast = () => {}; // Selectionのraycastから除外（ピック不可）
+      edges.matrixAutoUpdate = false;
+      node.add(edges);
+    });
   }
 }
