@@ -30,6 +30,31 @@ function collectMaterials(roots: Iterable<THREE.Object3D>): THREE.Material[] {
   return [...set];
 }
 
+// main() の各 await 完了前は画面がキャンバス背景のみになるため、読み込み中である
+// ことを示すインジケーターを表示する。main().catch() からも消去できるよう
+// モジュールスコープで参照を保持する。
+let loadingEl: HTMLElement | null = null;
+
+function showLoading(): void {
+  const panel = document.createElement('aside');
+  panel.className = 'panel';
+  panel.setAttribute('aria-label', '読み込み中');
+  panel.style.cssText =
+    'position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); max-width:360px; text-align:center;';
+
+  const text = document.createElement('p');
+  text.textContent = '読み込み中…';
+
+  panel.appendChild(text);
+  document.body.appendChild(panel);
+  loadingEl = panel;
+}
+
+function hideLoading(): void {
+  loadingEl?.remove();
+  loadingEl = null;
+}
+
 /**
  * 起動エントリ。各モジュールを結線し、URLパラメータを解釈する。
  * 参照: docs/viewer-design.md §2/§3/§4/§7
@@ -47,6 +72,8 @@ function collectMaterials(roots: Iterable<THREE.Object3D>): THREE.Material[] {
  *   将来: ?camera=&layer=&object=（Phase 5 Camera URL Sharing）
  */
 async function main(): Promise<void> {
+  showLoading();
+
   const canvas = document.getElementById('viewer') as HTMLCanvasElement;
   const treeEl = document.getElementById('tree') as HTMLElement;
   const propsEl = document.getElementById('props') as HTMLElement;
@@ -72,6 +99,7 @@ async function main(): Promise<void> {
 
   const modelLoader = new ModelLoader(scene.renderer);
   const bounds = await modelLoader.loadAll(data, scene.scene);
+  hideLoading();
 
   const layers = new Layers(modelLoader.partRoots);
   // アクティブカメラをプロバイダで渡し、投影切替後もレイキャストが描画中の
@@ -178,6 +206,8 @@ async function main(): Promise<void> {
 
 main().catch((err) => {
   console.error('[viewer] fatal:', err);
+
+  hideLoading();
 
   const message = err instanceof Error ? err.message : String(err);
 
