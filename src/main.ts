@@ -9,6 +9,7 @@ import { Clipping } from './viewer/Clipping';
 import { ModelTree } from './ui/ModelTree';
 import { PropertyPanel } from './ui/PropertyPanel';
 import { ClippingPanel } from './ui/ClippingPanel';
+import { ScaleBar } from './ui/ScaleBar';
 import { applyViewState, serializeViewState } from './viewer/ViewState';
 
 /**
@@ -80,6 +81,7 @@ async function main(): Promise<void> {
   const propsEl = document.getElementById('props') as HTMLElement;
   const clipEl = document.getElementById('clip') as HTMLElement;
   const toolbarEl = document.getElementById('toolbar') as HTMLElement;
+  const scalebarEl = document.getElementById('scalebar') as HTMLElement;
 
   const params = new URLSearchParams(location.search);
   const project = params.get('project') ?? 'project-a';
@@ -120,9 +122,21 @@ async function main(): Promise<void> {
   const clipPanel = new ClippingPanel(clipEl, clipping, bounds);
   clipPanel.render();
 
+  const scaleBar = new ScaleBar(scalebarEl);
+
   // 現在の標準ビュー。投影切替時に同じ構図で再フィットするため保持する。
   let currentView: StandardView = 'perspective';
   let projection: 'perspective' | 'orthographic' = 'perspective';
+
+  // 平行投影のときだけスケールバーを表示・更新する（透視投影では非表示）。
+  const updateScaleBar = (): void => {
+    if (projection !== 'orthographic') {
+      scaleBar.hide();
+      return;
+    }
+    scaleBar.show();
+    scaleBar.render(camera, canvas.clientWidth);
+  };
 
   const setView = (view: StandardView): void => {
     currentView = view;
@@ -149,6 +163,7 @@ async function main(): Promise<void> {
   }
   tree.render();
   clipPanel.render();
+  updateScaleBar();
 
   // --- Toolbar --------------------------------------------------------------
   const addButton = (label: string, onClick: () => void): HTMLButtonElement => {
@@ -171,6 +186,7 @@ async function main(): Promise<void> {
     camera.applyStandardView(currentView, bounds); // 新カメラで同じ構図に再フィット
     projBtn.textContent = projection === 'perspective' ? '平行投影' : '透視投影';
     projBtn.setAttribute('aria-pressed', String(projection === 'orthographic'));
+    updateScaleBar();
   });
   projBtn.textContent = projection === 'perspective' ? '平行投影' : '透視投影';
   projBtn.setAttribute('aria-pressed', String(projection === 'orthographic'));
@@ -238,10 +254,16 @@ async function main(): Promise<void> {
   // ウィンドウリサイズでカメラのアスペクト比を追従（描画バッファはScene側で更新）。
   window.addEventListener('resize', () => {
     camera.setAspect(window.innerWidth / window.innerHeight);
+    updateScaleBar();
   });
 
   // アクティブカメラをプロバイダで渡し、投影切替を毎フレーム反映させる。
-  scene.start(() => camera.active, () => camera.update());
+  // スケールバーはOrbitControlsのズーム(orthographic.zoom)に追従させるため、
+  // 平行投影時は毎フレーム再計算する。
+  scene.start(() => camera.active, () => {
+    camera.update();
+    updateScaleBar();
+  });
   console.log(`[viewer] loaded ${project} rev=${data.manifest.revision}`);
 }
 

@@ -39,6 +39,10 @@
       #toolbar button:hover { background: #eef1f4; }
       #toolbar button[aria-pressed="true"] { background: #1c2126; color: #fff; border-color: #1c2126; }
       #clip { left: 12px; bottom: 14px; padding: 10px 12px; min-width: 240px; }
+      /* 平行投影時のみ表示するスケールバー（右下）。 */
+      #scalebar { right: 12px; bottom: 14px; padding: 8px 12px; display: flex; align-items: center; gap: 8px; }
+      #scalebar .scalebar-bar { height: 6px; border-left: 2px solid #1c2126; border-right: 2px solid #1c2126; border-bottom: 2px solid #1c2126; }
+      #scalebar .scalebar-label { font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
       #clip .clip-row { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
       #clip .clip-row span { width: 46px; flex: none; }
       #clip .clip-row input[type="range"] { flex: 1; width: 0; }
@@ -62,7 +66,7 @@
           min-width: 0;
           width: min(260px, calc(100vw - 24px));
           max-width: calc(100vw - 24px);
-          bottom: 66px;
+          bottom: 78px;
           padding: 8px 10px;
         }
         #clip .clip-row span { width: 36px; }
@@ -74,8 +78,27 @@
           overflow-x: auto;
           flex-wrap: nowrap;
           -webkit-overflow-scrolling: touch;
+          /* 横スクロールバー分のトラック高さをレイアウトに含めない
+             （実機測定でスクロールバー込みの高さが想定より約17px大きく、
+             #clip/#scalebarとの重なりを引き起こしていたため、非表示にして
+             高さの見積もりを安定させる。ホイール/スワイプでのスクロールは維持）。 */
+          scrollbar-width: none;
+          -ms-overflow-style: none;
         }
+        #toolbar::-webkit-scrollbar { display: none; }
         #toolbar button { flex: none; }
+        /* モバイルで#scalebarを#clipと同じ下段(bottom:78px)に置くと、#clipが
+           最大260px幅まで伸びる一方#scalebarは幅無制限のため、狭い画面
+           （幅375px前後）で水平方向に重なり得る（実機検証で確認）。
+           #propsの下（#propsはmax-height:40vhで頭打ちのため、その高さに
+           位置を固定しても#propsの実高さに関わらず重ならない）に退避させる。 */
+        #scalebar {
+          top: calc(40vh + 32px);
+          bottom: auto;
+          right: 12px;
+          max-width: calc(50vw - 18px);
+          padding: 6px 10px;
+        }
       }
     </style>
   </head>
@@ -85,6 +108,10 @@
       <aside id="tree" class="panel" aria-label="モデルツリー"></aside>
       <aside id="props" class="panel" aria-label="プロパティパネル"></aside>
       <aside id="clip" class="panel" aria-label="断面"></aside>
+      <aside id="scalebar" class="panel" aria-label="縮尺" hidden>
+        <div class="scalebar-bar"></div>
+        <div class="scalebar-label"></div>
+      </aside>
       <nav id="toolbar" class="panel" aria-label="ツールバー"></nav>
     </div>
     <script type="module" src="/src/main.ts"></script>
