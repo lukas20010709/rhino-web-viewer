@@ -9,3 +9,5 @@ dist/
 public/projects/project-a/*.glb
 # three 同梱デコーダの複製（scripts/copy-decoders.mjs が build/dev 前に生成。第三者バイナリはコミットしない）
 public/decoders/
+# 実クライアント案件データを使ったローカル動作確認用プロジェクト（非公開・コミット禁止）
+public/projects/sala-trial/

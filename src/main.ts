@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { ProjectLoader } from './data/ProjectLoader';
 import { Scene } from './viewer/Scene';
 import { Camera, type StandardView } from './viewer/Camera';
@@ -7,14 +8,31 @@ import { Layers } from './viewer/Layers';
 import { Clipping } from './viewer/Clipping';
 import { ModelTree } from './ui/ModelTree';
 import { PropertyPanel } from './ui/PropertyPanel';
+import { ClippingPanel } from './ui/ClippingPanel';
+
+/** シーン内の全メッシュからマテリアルを重複なく収集する（Clipping適用対象） */
+function collectMaterials(roots: Iterable<THREE.Object3D>): THREE.Material[] {
+  const set = new Set<THREE.Material>();
+  for (const root of roots) {
+    root.traverse((o) => {
+      if (o instanceof THREE.Mesh) {
+        const mat = o.material as THREE.Material | THREE.Material[];
+        if (Array.isArray(mat)) mat.forEach((m) => set.add(m));
+        else set.add(mat);
+      }
+    });
+  }
+  return [...set];
+}
 
 /**
  * 起動エントリ。各モジュールを結線し、URLパラメータを解釈する。
  * 参照: docs/viewer-design.md §2/§3/§4/§7
  *
  * Phase 1 MVP UI を組み上げる:
- *   - Model Tree（左）  : part の表示ON/OFF
- *   - Property Panel（右）: 選択オブジェクトの Object ID / metadata 属性
+ *   - Model Tree（左上）  : part の表示ON/OFF
+ *   - Property Panel（右上）: 選択オブジェクトの Object ID / metadata 属性
+ *   - Clipping Panel（左下）: XYZ軸ごとの断面(Clipping Plane) ON/OFF・位置・反転
  *   - Toolbar（下）      : 標準ビュー / Perspective↔Orthographic / Fit / Reset
  *   - キーボード         : Esc（選択解除）/ F（Fit）/ H（Hide）/ I（Isolate）/ R（Reset）
  *
@@ -27,6 +45,7 @@ async function main(): Promise<void> {
   const canvas = document.getElementById('viewer') as HTMLCanvasElement;
   const treeEl = document.getElementById('tree') as HTMLElement;
   const propsEl = document.getElementById('props') as HTMLElement;
+  const clipEl = document.getElementById('clip') as HTMLElement;
   const toolbarEl = document.getElementById('toolbar') as HTMLElement;
 
   const params = new URLSearchParams(location.search);
@@ -54,7 +73,8 @@ async function main(): Promise<void> {
   // カメラと一致するようにする（固定参照だとOrtho切替後に選択が誤ヒットする）。
   const selection = new Selection(() => camera.active, scene.scene, data.metadata);
   const clipping = new Clipping();
-  void clipping; // Section基盤（Phase 4のUIで結線）。
+  clipping.init(bounds);
+  clipping.registerMaterials(collectMaterials(modelLoader.partRoots.values()));
 
   // --- UI 結線 --------------------------------------------------------------
   const tree = new ModelTree(treeEl, layers);
@@ -62,6 +82,9 @@ async function main(): Promise<void> {
 
   const props = new PropertyPanel(propsEl);
   props.show(null);
+
+  const clipPanel = new ClippingPanel(clipEl, clipping, bounds);
+  clipPanel.render();
 
   // 現在の標準ビュー。投影切替時に同じ構図で再フィットするため保持する。
   let currentView: StandardView = 'perspective';
@@ -77,6 +100,8 @@ async function main(): Promise<void> {
     layers.showAll();
     tree.render();
     props.show(null);
+    clipping.disableAll();
+    clipPanel.render();
   };
 
   camera.applyStandardView(currentView, bounds);

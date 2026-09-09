@@ -7,7 +7,8 @@
     <style>
       html, body { margin: 0; height: 100%; overflow: hidden; font-family: system-ui, sans-serif; }
       #app { position: fixed; inset: 0; }
-      #viewer { position: absolute; inset: 0; }
+      /* canvasは置換要素のためinset:0だけでは伸びない。width/height明示が必須。 */
+      #viewer { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
       /* Phase 1 MVP UI: Model Tree(左) / Property(右) / Toolbar(下) のオーバーレイ。 */
       .panel {
@@ -20,8 +21,8 @@
         color: #1c2126;
         pointer-events: auto;
       }
-      #tree { top: 12px; left: 12px; padding: 10px 12px; max-height: 60vh; overflow: auto; min-width: 150px; }
-      #tree h3, #props h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #5b6470; }
+      #tree { top: 12px; left: 12px; padding: 10px 12px; max-height: 45vh; overflow: auto; min-width: 150px; }
+      #tree h3, #props h3, #clip h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #5b6470; }
       #tree label { display: block; padding: 2px 0; cursor: pointer; user-select: none; }
       #props { top: 12px; right: 12px; padding: 10px 12px; min-width: 200px; max-width: 320px; max-height: 60vh; overflow: auto; }
       #props table { border-collapse: collapse; width: 100%; }
@@ -37,6 +38,15 @@
       }
       #toolbar button:hover { background: #eef1f4; }
       #toolbar button[aria-pressed="true"] { background: #1c2126; color: #fff; border-color: #1c2126; }
+      #clip { left: 12px; bottom: 14px; padding: 10px 12px; min-width: 240px; }
+      #clip .clip-row { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+      #clip .clip-row span { width: 46px; flex: none; }
+      #clip .clip-row input[type="range"] { flex: 1; width: 0; }
+      #clip .clip-row button {
+        font: inherit; font-size: 11px; padding: 2px 6px; border: 1px solid #c3c7cd;
+        background: #fff; border-radius: 4px; cursor: pointer; color: #1c2126;
+      }
+      #clip .clip-row button:hover { background: #eef1f4; }
     </style>
   </head>
   <body>
@@ -44,6 +54,7 @@
       <canvas id="viewer"></canvas>
       <aside id="tree" class="panel" aria-label="モデルツリー"></aside>
       <aside id="props" class="panel" aria-label="プロパティパネル"></aside>
+      <aside id="clip" class="panel" aria-label="断面"></aside>
       <nav id="toolbar" class="panel" aria-label="ツールバー"></nav>
     </div>
     <script type="module" src="/src/main.ts"></script>
