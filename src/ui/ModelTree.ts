@@ -10,7 +10,7 @@ export class ModelTree {
   render(): void {
     this.el.innerHTML = '';
     const heading = document.createElement('h3');
-    heading.textContent = 'Model Tree';
+    heading.textContent = 'モデルツリー';
     this.el.appendChild(heading);
     for (const partId of this.layers.list()) {
       const label = document.createElement('label');

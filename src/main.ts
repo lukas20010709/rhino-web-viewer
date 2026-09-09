@@ -91,22 +91,22 @@ async function main(): Promise<void> {
     return btn;
   };
 
-  addButton('Fit', () => setView('perspective'));
-  addButton('Top', () => setView('top'));
-  addButton('Front', () => setView('front'));
-  addButton('Side', () => setView('side'));
-  addButton('Iso', () => setView('perspective'));
+  addButton('全体表示', () => setView('perspective'));
+  addButton('上面', () => setView('top'));
+  addButton('正面', () => setView('front'));
+  addButton('側面', () => setView('side'));
+  addButton('アイソメ', () => setView('perspective'));
 
-  const projBtn = addButton('Ortho', () => {
+  const projBtn = addButton('平行投影', () => {
     projection = projection === 'perspective' ? 'orthographic' : 'perspective';
     camera.setProjection(projection);
     camera.applyStandardView(currentView, bounds); // 新カメラで同じ構図に再フィット
-    projBtn.textContent = projection === 'perspective' ? 'Ortho' : 'Persp';
+    projBtn.textContent = projection === 'perspective' ? '平行投影' : '透視投影';
     projBtn.setAttribute('aria-pressed', String(projection === 'orthographic'));
   });
   projBtn.setAttribute('aria-pressed', 'false');
 
-  addButton('Reset', resetAll);
+  addButton('リセット', resetAll);
 
   // --- 選択（Click）→ Property Panel ---------------------------------------
   canvas.addEventListener('pointerdown', (e) => {
