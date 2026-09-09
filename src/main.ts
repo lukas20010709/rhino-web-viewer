@@ -9,6 +9,7 @@ import { Clipping } from './viewer/Clipping';
 import { ModelTree } from './ui/ModelTree';
 import { PropertyPanel } from './ui/PropertyPanel';
 import { ClippingPanel } from './ui/ClippingPanel';
+import { applyViewState, serializeViewState } from './viewer/ViewState';
 
 /**
  * シーン内の全メッシュ・輪郭線からマテリアルを重複なく収集する（Clipping適用対象）。
@@ -137,7 +138,17 @@ async function main(): Promise<void> {
     clipPanel.render();
   };
 
-  camera.applyStandardView(currentView, bounds);
+  // URLに ?view=... があれば復元し、既定のフィット(camera.applyStandardView)は
+  // 復元が無い場合のみ実行する（復元後に既定構図で上書きされないようにする）。
+  const restored = applyViewState(params, camera, clipping, layers, bounds);
+  if (restored) {
+    currentView = restored.view;
+    projection = restored.projection;
+  } else {
+    camera.applyStandardView(currentView, bounds);
+  }
+  tree.render();
+  clipPanel.render();
 
   // --- Toolbar --------------------------------------------------------------
   const addButton = (label: string, onClick: () => void): HTMLButtonElement => {
@@ -161,9 +172,39 @@ async function main(): Promise<void> {
     projBtn.textContent = projection === 'perspective' ? '平行投影' : '透視投影';
     projBtn.setAttribute('aria-pressed', String(projection === 'orthographic'));
   });
-  projBtn.setAttribute('aria-pressed', 'false');
+  projBtn.textContent = projection === 'perspective' ? '平行投影' : '透視投影';
+  projBtn.setAttribute('aria-pressed', String(projection === 'orthographic'));
 
   addButton('リセット', resetAll);
+
+  const copyUrlBtn = addButton('URLをコピー', () => {
+    if (!navigator.clipboard) {
+      console.error('[viewer] clipboard API unavailable (requires HTTPS or localhost)');
+      copyUrlBtn.textContent = 'コピー不可';
+      setTimeout(() => {
+        copyUrlBtn.textContent = 'URLをコピー';
+      }, 1500);
+      return;
+    }
+
+    const stateParams = serializeViewState(camera, clipping, layers, currentView, projection);
+    const url = new URL(location.href);
+    url.search = '';
+    url.searchParams.set('project', project);
+    for (const [key, value] of stateParams) url.searchParams.set(key, value);
+
+    navigator.clipboard.writeText(url.toString())
+      .then(() => {
+        const original = copyUrlBtn.textContent;
+        copyUrlBtn.textContent = 'コピーしました';
+        setTimeout(() => {
+          copyUrlBtn.textContent = original;
+        }, 1500);
+      })
+      .catch((err) => {
+        console.error('[viewer] clipboard write failed:', err);
+      });
+  });
 
   // --- 選択（Click）→ Property Panel ---------------------------------------
   canvas.addEventListener('pointerdown', (e) => {
