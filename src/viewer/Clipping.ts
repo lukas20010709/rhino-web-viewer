@@ -84,6 +84,9 @@ export class Clipping {
 
   private apply(): void {
     const planes = this.activePlanes();
+    // 契約: 登録済みマテリアルには常に（0枚でも）同一参照のclippingPlanes配列を設定する。
+    // Scene.ts の断面キャップ同期（Clipping Cap）はこの参照の変化を手がかりに再構築するため、
+    // 各マテリアルへ個別配列を割り当てたり未設定のままにしたりしないこと。
     for (const m of this.materials) {
       m.clippingPlanes = planes;
       m.clipShadows = planes.length > 0;
