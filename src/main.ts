@@ -10,12 +10,17 @@ import { ModelTree } from './ui/ModelTree';
 import { PropertyPanel } from './ui/PropertyPanel';
 import { ClippingPanel } from './ui/ClippingPanel';
 
-/** シーン内の全メッシュからマテリアルを重複なく収集する（Clipping適用対象） */
+/**
+ * シーン内の全メッシュ・輪郭線からマテリアルを重複なく収集する（Clipping適用対象）。
+ * ModelLoader が付与する輪郭線（THREE.LineSegments、EdgesGeometry）は THREE.Mesh
+ * ではないため、Mesh only の走査では登録漏れし、断面(Clipping)を有効にしても
+ * 輪郭線だけモデル全体の形状のまま透けて残ってしまう。LineSegments も対象に含める。
+ */
 function collectMaterials(roots: Iterable<THREE.Object3D>): THREE.Material[] {
   const set = new Set<THREE.Material>();
   for (const root of roots) {
     root.traverse((o) => {
-      if (o instanceof THREE.Mesh) {
+      if (o instanceof THREE.Mesh || o instanceof THREE.LineSegments) {
         const mat = o.material as THREE.Material | THREE.Material[];
         if (Array.isArray(mat)) mat.forEach((m) => set.add(m));
         else set.add(mat);
@@ -173,5 +178,24 @@ async function main(): Promise<void> {
 
 main().catch((err) => {
   console.error('[viewer] fatal:', err);
-  document.body.insertAdjacentHTML('beforeend', `<pre style="color:red">${String(err)}</pre>`);
+
+  const message = err instanceof Error ? err.message : String(err);
+
+  // 既存の .panel クラス（index.html のスタイルシート）を流用し、
+  // アプリの見た目と統一したエラー表示にする。id/DOM構造には依存しない。
+  const panel = document.createElement('aside');
+  panel.className = 'panel';
+  panel.setAttribute('aria-label', 'エラー');
+  panel.style.cssText =
+    'position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); max-width:360px; text-align:center;';
+
+  const heading = document.createElement('h2');
+  heading.textContent = 'モデルの読み込みに失敗しました';
+
+  const detail = document.createElement('p');
+  detail.textContent = message;
+
+  panel.appendChild(heading);
+  panel.appendChild(detail);
+  document.body.appendChild(panel);
 });
