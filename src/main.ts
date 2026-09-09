@@ -143,7 +143,7 @@ async function main(): Promise<void> {
   window.addEventListener('keydown', (e) => {
     switch (e.key) {
       case 'Escape':
-        selection.current = null;
+        selection.deselect();
         props.show(null);
         break;
       case 'f': case 'F':
