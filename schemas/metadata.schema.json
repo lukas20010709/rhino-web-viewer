@@ -1,0 +1,71 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://example.com/rhino-web-viewer/schemas/metadata.schema.json",
+  "title": "Model Metadata",
+  "description": "GLBのObject IDをキーに属性を保持する。属性の源泉はRhino UserText。将来DB化してもキー契約を維持しViewerを作り直さない。",
+  "type": "object",
+  "required": ["schemaVersion", "project", "revision", "objects"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "project": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "revision": {
+      "type": "string",
+      "description": "manifest.json の revision と一致させる。"
+    },
+    "objects": {
+      "type": "object",
+      "description": "キー = GLB内Object ID (例 WALL_A001)。値 = 属性オブジェクト。",
+      "minProperties": 0,
+      "propertyNames": {
+        "pattern": "^[A-Z][A-Z0-9_]*[0-9]{3}$",
+        "description": "Object ID規約: 英大文字プレフィックス + アンダースコア + 3桁以上連番 (例 WALL_A001, CHAIR_001)。"
+      },
+      "additionalProperties": { "$ref": "#/definitions/objectAttributes" }
+    }
+  },
+  "definitions": {
+    "objectAttributes": {
+      "type": "object",
+      "description": "Rhino UserTextキーに対応。未知キーは許容 (拡張性のため) しつつ標準キーを定義。",
+      "additionalProperties": true,
+      "properties": {
+        "layer": {
+          "type": "string",
+          "description": "所属レイヤー (例 03_WALL)。rhino-conventions のレイヤー標準に一致。"
+        },
+        "category": {
+          "type": "string",
+          "description": "分類 (例 wall, furniture, lighting)。"
+        },
+        "material": {
+          "type": "string",
+          "description": "素材名 (例 plaster, oak)。"
+        },
+        "status": {
+          "type": "string",
+          "description": "設計ステータス。",
+          "enum": ["design", "proposal", "fixed", "asbuilt"]
+        },
+        "manufacturer": {
+          "type": "string",
+          "description": "メーカー (家具・設備等)。NDA配慮の対象になり得る。"
+        },
+        "room": {
+          "type": "string",
+          "description": "所属室 (例 meeting_01)。"
+        },
+        "url": {
+          "type": "string",
+          "description": "外部参照URL (製品ページ等)。公開範囲に注意。"
+        }
+      }
+    }
+  }
+}

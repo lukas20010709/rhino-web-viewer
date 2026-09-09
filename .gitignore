@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+.vite/
+# 大容量の生GLB（最適化前）はコミットしない。公開対象は public/projects/ の最適化済みのみ。
+*.raw.glb
+# デモ用プレースホルダGLB（scripts/make-demo-glb.mjs が生成。ローカル開発専用・コミットしない）
+public/projects/project-a/*.glb
+# three 同梱デコーダの複製（scripts/copy-decoders.mjs が build/dev 前に生成。第三者バイナリはコミットしない）
+public/decoders/

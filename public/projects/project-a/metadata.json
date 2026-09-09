@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "1.0.0",
+  "project": "project-a",
+  "revision": "2026-09-09-01",
+  "objects": {
+    "WALL_A001": {
+      "layer": "03_WALL",
+      "category": "wall",
+      "material": "plaster",
+      "status": "design"
+    },
+    "WALL_A002": {
+      "layer": "03_WALL",
+      "category": "wall",
+      "material": "concrete",
+      "status": "fixed"
+    },
+    "CHAIR_001": {
+      "layer": "06_FURNITURE",
+      "category": "furniture",
+      "material": "oak",
+      "status": "proposal",
+      "manufacturer": "sample-maker",
+      "room": "meeting_01"
+    },
+    "LIGHT_012": {
+      "layer": "07_LIGHTING",
+      "category": "lighting",
+      "material": "aluminum",
+      "status": "design",
+      "room": "meeting_01"
+    }
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "1.0.0",
+  "project": "project-a",
+  "revision": "2026-09-09-01",
+  "title": "Project A — サンプルモデル",
+  "unit": "mm",
+  "up": "Y",
+  "origin": "origin.json",
+  "metadata": "metadata.json",
+  "thumbnail": "thumbnail.webp",
+  "createdAt": "2026-09-09T00:00:00Z",
+  "parts": [
+    {
+      "id": "site",
+      "file": "site.glb",
+      "loadPriority": 1,
+      "defaultVisible": true,
+      "sizeBytes": 2400000,
+      "triangleCount": 45000
+    },
+    {
+      "id": "structure",
+      "file": "structure.glb",
+      "loadPriority": 2,
+      "defaultVisible": true,
+      "sizeBytes": 5800000,
+      "triangleCount": 120000
+    },
+    {
+      "id": "architecture",
+      "file": "architecture.glb",
+      "loadPriority": 3,
+      "defaultVisible": true,
+      "sizeBytes": 7200000,
+      "triangleCount": 180000
+    },
+    {
+      "id": "furniture",
+      "file": "furniture.glb",
+      "loadPriority": 4,
+      "defaultVisible": false,
+      "sizeBytes": 3100000,
+      "triangleCount": 90000
+    }
+  ]
+}

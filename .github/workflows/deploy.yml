@@ -1,0 +1,63 @@
+name: Deploy Viewer to GitHub Pages
+
+# 章24/25: git push → GitHub Actions(型/manifest/リンク/スモーク) → Build → GitHub Pages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: TypeScript Check
+        run: npm run typecheck
+
+      - name: Model Manifest Check + Broken Path Check
+        run: npm run validate
+
+      - name: Build
+        env:
+          # project pages 配信時は base を /<repo>/ に。リポジトリ名から自動導出。
+          VITE_BASE: /${{ github.event.repository.name }}/
+        run: npm run build
+
+      - name: Smoke Test (dist 生成物の存在確認)
+        run: |
+          test -f dist/index.html || (echo "dist/index.html missing" && exit 1)
+          echo "smoke ok"
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

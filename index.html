@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Rhino Web Viewer</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; font-family: system-ui, sans-serif; }
+      #app { position: fixed; inset: 0; }
+      #viewer { position: absolute; inset: 0; }
+
+      /* Phase 1 MVP UI: Model Tree(左) / Property(右) / Toolbar(下) のオーバーレイ。 */
+      .panel {
+        position: absolute;
+        background: rgba(255, 255, 255, 0.92);
+        border: 1px solid #d0d3d8;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+        font-size: 13px;
+        color: #1c2126;
+        pointer-events: auto;
+      }
+      #tree { top: 12px; left: 12px; padding: 10px 12px; max-height: 60vh; overflow: auto; min-width: 150px; }
+      #tree h3, #props h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #5b6470; }
+      #tree label { display: block; padding: 2px 0; cursor: pointer; user-select: none; }
+      #props { top: 12px; right: 12px; padding: 10px 12px; min-width: 200px; max-width: 320px; max-height: 60vh; overflow: auto; }
+      #props table { border-collapse: collapse; width: 100%; }
+      #props th { text-align: left; color: #5b6470; font-weight: 600; padding: 2px 8px 2px 0; vertical-align: top; white-space: nowrap; }
+      #props td { padding: 2px 0; word-break: break-word; }
+      #toolbar {
+        left: 50%; bottom: 14px; transform: translateX(-50%);
+        display: flex; gap: 4px; padding: 6px;
+      }
+      #toolbar button {
+        font: inherit; font-size: 12px; padding: 5px 10px; border: 1px solid #c3c7cd;
+        background: #fff; border-radius: 6px; cursor: pointer; color: #1c2126;
+      }
+      #toolbar button:hover { background: #eef1f4; }
+      #toolbar button[aria-pressed="true"] { background: #1c2126; color: #fff; border-color: #1c2126; }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="viewer"></canvas>
+      <aside id="tree" class="panel" aria-label="Model Tree"></aside>
+      <aside id="props" class="panel" aria-label="Property Panel"></aside>
+      <nav id="toolbar" class="panel" aria-label="Toolbar"></nav>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

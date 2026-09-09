@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://example.com/rhino-web-viewer/schemas/origin.schema.json",
+  "title": "Model Origin",
+  "description": "巨大な測量座標をWebGLに渡さないための Local Origin 定義。GLBは (0,0,0) 基準で書き出し、世界座標復元情報をここに保持する (浮動小数点精度対策)。",
+  "type": "object",
+  "required": ["schemaVersion", "worldOrigin", "unit"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "worldOrigin": {
+      "type": "object",
+      "description": "Local Origin (0,0,0) が対応する世界座標。GLB座標に加算すると世界座標へ戻る。",
+      "required": ["x", "y", "z"],
+      "additionalProperties": false,
+      "properties": {
+        "x": { "type": "number", "description": "世界座標X (例 53820000)。" },
+        "y": { "type": "number", "description": "世界座標Y (例 14920000)。" },
+        "z": { "type": "number", "description": "世界座標Z (標高等)。", "default": 0 }
+      }
+    },
+    "rotation": {
+      "type": "object",
+      "description": "真北等に対する回転補正 (度)。既定は無回転。",
+      "additionalProperties": false,
+      "properties": {
+        "x": { "type": "number", "default": 0 },
+        "y": { "type": "number", "default": 0 },
+        "z": { "type": "number", "default": 0 }
+      }
+    },
+    "unit": {
+      "type": "string",
+      "description": "worldOrigin の単位。manifest.unit と整合させる。",
+      "enum": ["mm", "cm", "m", "in", "ft"]
+    },
+    "epsg": {
+      "type": ["integer", "null"],
+      "description": "測地座標系のEPSGコード (例 6677 = JGD2011 平面直角座標系IX系)。不明時は null。"
+    }
+  }
+}
