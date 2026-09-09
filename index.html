@@ -47,6 +47,36 @@
         background: #fff; border-radius: 4px; cursor: pointer; color: #1c2126;
       }
       #clip .clip-row button:hover { background: #eef1f4; }
+
+      /* 狭幅ビューポート(スマートフォン等)向けレイアウト調整。パネル構成・配置概念は維持し、重なり/はみ出しのみ解消する。 */
+      @media (max-width: 600px) {
+        .panel { font-size: 12px; }
+        #tree, #props {
+          min-width: 0;
+          max-width: calc(50vw - 18px);
+          padding: 8px 10px;
+        }
+        #tree { max-height: 35vh; }
+        #props { max-height: 40vh; }
+        #clip {
+          min-width: 0;
+          width: min(260px, calc(100vw - 24px));
+          max-width: calc(100vw - 24px);
+          bottom: 66px;
+          padding: 8px 10px;
+        }
+        #clip .clip-row span { width: 36px; }
+        /* min-width:0 の#clipはshrink-to-fitで縮み、flex:1のsliderが幅0近くまで
+           潰れ得る（実機検証で確認: 幅18.6pxで事実上操作不能）。明示的な下限を設ける。 */
+        #clip .clip-row input[type="range"] { min-width: 60px; }
+        #toolbar {
+          max-width: calc(100vw - 24px);
+          overflow-x: auto;
+          flex-wrap: nowrap;
+          -webkit-overflow-scrolling: touch;
+        }
+        #toolbar button { flex: none; }
+      }
     </style>
   </head>
   <body>
