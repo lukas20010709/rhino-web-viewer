@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "project": "hut-demo",
-  "revision": "2026-09-11-hut-v2",
+  "revision": "2026-09-11-hut-v3",
   "unit": "mm",
   "up": "Y",
   "origin": "origin.json",

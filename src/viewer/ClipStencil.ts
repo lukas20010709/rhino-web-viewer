@@ -14,9 +14,15 @@ import * as THREE from 'three';
  * 描く手法（three.js公式サンプル webgl_clipping_stencil と同じ原理）。
  * ここではメッシュごと・軸ごとに独立したグループを持たせ、キャップの色は
  * そのメッシュ自身のマテリアル色を流用する（カテゴリ別の色分けがそのまま
- * 断面にも引き継がれる）。ステンシル値は「書き込み→キャップで消費して0に
- * 戻す」設計のため、メッシュ間で明示的なクリアをせずに共存できる。
- * 凸形状（本ビューアーの壁/床/屋根等の単純な箱形状）を前提とした実装。
+ * 断面にも引き継がれる）。キャップは NotEqualStencilFunc(ref=0) で「0でない
+ * 箇所」を描画し、直後に ZeroStencilOp で0へ戻す設計のため、メッシュ間で
+ * 明示的なバッファクリアをせずに共存できる（描画順はrenderOrderで保証）。
+ * 閉じたソリッド（水密メッシュ）であれば、増減の累積値は形状の凹凸に関わらず
+ * カメラ視点ごとに「内側なら非0・外側なら0」になる（前面/背面の通過回数差は
+ * 視点によって変わり得るが、0か非0かという符号は不変）。かつて各メッシュ×軸に
+ * ユニークな大きな値を割り当ててEqualStencilFuncで一致判定していたが、実際に
+ * 蓄積される値（多くの場合1）とは一致しないことがあり、一部メッシュでキャップが
+ * 全く描画されない不具合があった（stencilRefは現在キャップの比較には使わない）。
  */
 
 /**
@@ -31,6 +37,8 @@ const HATCH_LINE_SPACING_PX = 8;
 const HATCH_LINE_WIDTH_PX = 2;
 /** ハッチ線1本あたりの実寸間隔(m)。キャップの大小に関わらず密度を揃える。 */
 const HATCH_WORLD_SPACING = 0.25;
+/** 1タイルに含まれるハッチ線の本数。repeat計算で実寸換算する際に必要。 */
+const HATCH_LINES_PER_TILE = HATCH_CANVAS_SIZE / HATCH_LINE_SPACING_PX;
 
 const hatchTextureCache = new Map<string, THREE.CanvasTexture>();
 
@@ -87,7 +95,6 @@ export class ClipStencil {
   private readonly entries: Entry[] = [];
   private readonly capGeometry = new THREE.PlaneGeometry(1, 1);
   private nextRenderOrder = 1000;
-  private nextStencilRef = 1;
 
   constructor(scene: THREE.Scene) {
     this.container.name = '__clipStencil';
@@ -106,19 +113,22 @@ export class ClipStencil {
     // 計算と同じ式で、境界球はジオメトリ由来なので毎フレーム変わらない）。
     mesh.geometry.computeBoundingSphere();
     const capSize = Math.max((mesh.geometry.boundingSphere?.radius ?? 1) * 2.5, 0.05);
-    const hatchRepeat = Math.max(capSize / HATCH_WORLD_SPACING, 1);
+    // タイル1枚にはHATCH_LINES_PER_TILE本の線が入っているため、線1本あたりの実寸間隔を
+    // HATCH_WORLD_SPACINGに揃えるにはタイル自体の実寸をその本数倍にする必要がある
+    // （でないと線間隔がHATCH_LINES_PER_TILE分の1に詰まってしまう）。
+    const hatchRepeat = Math.max(capSize / (HATCH_WORLD_SPACING * HATCH_LINES_PER_TILE), 1);
 
     const slots: AxisSlot[] = [];
     for (let i = 0; i < MAX_SIMULTANEOUS_PLANES; i++) {
-      const stencilRef = this.nextStencilRef++;
       const renderOrder = this.nextRenderOrder++;
 
+      // マスクはAlwaysStencilFuncのためstencilRefの値自体は比較に使われない
+      // （常に通過し、Incr/Decrで既存値を増減するだけ）。
       const maskBackMaterial = new THREE.MeshBasicMaterial({
         colorWrite: false,
         depthWrite: false,
         side: THREE.BackSide,
         stencilWrite: true,
-        stencilRef,
         stencilFunc: THREE.AlwaysStencilFunc,
         stencilFail: THREE.IncrementWrapStencilOp,
         stencilZFail: THREE.IncrementWrapStencilOp,
@@ -129,7 +139,6 @@ export class ClipStencil {
         depthWrite: false,
         side: THREE.FrontSide,
         stencilWrite: true,
-        stencilRef,
         stencilFunc: THREE.AlwaysStencilFunc,
         stencilFail: THREE.DecrementWrapStencilOp,
         stencilZFail: THREE.DecrementWrapStencilOp,
@@ -149,14 +158,18 @@ export class ClipStencil {
 
       // キャップはメッシュ自身のマテリアル色から生成したハッチングテクスチャを貼る
       // （建築断面図の慣習に倣い、単色塗りつぶしではなく断面であることを示す）。
-      // ステンシルが「一致したピクセルだけ描画し、直後にその値を0へ戻す」ため、
-      // 他メッシュのグループと明示的なバッファクリアなしで共存できる
-      // （描画順はrenderOrderで保証）。
+      // NotEqualStencilFunc(ref=0)で「ステンシルが0でない箇所」だけ描画し、
+      // 直後にZeroStencilOpで0へ戻す。閉じたソリッドなら増減の累積値は視点に
+      // よらず「内側なら非0」になるため、EqualStencilFuncでメッシュごとの
+      // 固有値に一致させる必要はない（かつてその方式で一部メッシュのキャップが
+      // 全く描画されない不具合があった）。他メッシュのグループと明示的な
+      // バッファクリアなしで共存できる（描画順はrenderOrderで保証）。
       const capTexture = getBaseHatchTexture(capColor).clone();
       capTexture.needsUpdate = true;
       capTexture.repeat.set(hatchRepeat, hatchRepeat);
       const capMaterial = new THREE.MeshStandardMaterial({
-        color: capColor,
+        // capTextureの地色・線色は既にcapColorを焼き込み済みなので、ここでcolorも
+        // 指定するとサンプル値に対して二重に乗算されて暗くなる（既定の白のままにする）。
         map: capTexture,
         side: THREE.DoubleSide,
         roughness: 0.9,
@@ -165,8 +178,8 @@ export class ClipStencil {
         polygonOffsetFactor: -2,
         polygonOffsetUnits: -2,
         stencilWrite: true,
-        stencilRef,
-        stencilFunc: THREE.EqualStencilFunc,
+        stencilRef: 0,
+        stencilFunc: THREE.NotEqualStencilFunc,
         stencilFail: THREE.ZeroStencilOp,
         stencilZFail: THREE.ZeroStencilOp,
         stencilZPass: THREE.ZeroStencilOp,

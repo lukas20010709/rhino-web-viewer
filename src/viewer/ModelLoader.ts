@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { ProjectData, ManifestPart } from '../data/types';
 
 /**
@@ -18,6 +19,12 @@ export class ModelLoader {
 
   /** 輪郭線（EdgesGeometry）のクリース角しきい値（度）。 */
   private static readonly EDGE_THRESHOLD_ANGLE = 20;
+  /**
+   * 頂点溶接（mergeVertices）の許容誤差。GLBの作業単位はglTF仕様上メートル固定
+   * （origin.jsonのunit="mm"はworldOrigin復元専用で、メッシュ座標とは無関係）。
+   * 1e-4 = 0.1mm相当。近接する別頂点を誤って溶接しない範囲で十分小さい値。
+   */
+  private static readonly WELD_TOLERANCE = 1e-4;
   private edgeMaterial: THREE.LineBasicMaterial;
 
   constructor(renderer: THREE.WebGLRenderer) {
@@ -86,6 +93,13 @@ export class ModelLoader {
    * roughness=1)になり、環境マップ（未使用）がない本ビューアーでは面が
    * ほぼ黒く沈んで見える（正反射しか出ないため）。建築/什器/設備等はいずれも
    * 非金属の塗装面が実態に近いため、ここで一律補正する。
+   *
+   * また、EdgesGeometry算出前に頂点溶接（mergeVertices）を行う。glTFは法線/UVが
+   * 隣接三角形間で異なる頂点をATTRIBUTE単位で分割するため（仕様上正しい挙動）、
+   * 幾何的には閉じたBrep由来でも、隣接面が共有するはずの辺がPOSITION以外の属性差で
+   * 別頂点として複製され、隣接関係（トポロジー）が失われる。ClipStencil.tsの
+   * 断面キャップ技法はこの隣接関係（各辺がちょうど2枚の三角形に共有される状態＝
+   * 多様体）を前提とするため、ここで位置一致の頂点を溶接し直して隣接関係を復元する。
    */
   private addSilhouetteEdges(root: THREE.Object3D): void {
     root.traverse((node) => {
@@ -95,6 +109,12 @@ export class ModelLoader {
         material.metalness = 0;
         material.roughness = 0.9;
       }
+      // mergeVerticesは新しいBufferGeometryを返す。EdgesGeometryや後続の
+      // ClipStencil.registerMesh（main.tsでloadAll完了後に呼ばれる）が溶接後の
+      // 形状を見るよう、EdgesGeometry算出前にnode.geometryを差し替える。
+      // 本プロジェクトのメッシュはmaterialが常に単一（配列ではない）ため、
+      // mergeVerticesがgroups（マルチマテリアル用）を扱う必要はない。
+      node.geometry = mergeVertices(node.geometry, ModelLoader.WELD_TOLERANCE);
       const edgesGeometry = new THREE.EdgesGeometry(node.geometry, ModelLoader.EDGE_THRESHOLD_ANGLE);
       const edges = new THREE.LineSegments(edgesGeometry, this.edgeMaterial);
       edges.name = `${node.name}__edges`;
