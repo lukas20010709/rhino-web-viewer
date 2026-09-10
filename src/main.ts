@@ -6,6 +6,7 @@ import { ModelLoader } from './viewer/ModelLoader';
 import { Selection } from './viewer/Selection';
 import { Layers } from './viewer/Layers';
 import { Clipping } from './viewer/Clipping';
+import { ClipStencil } from './viewer/ClipStencil';
 import { ModelTree } from './ui/ModelTree';
 import { PropertyPanel } from './ui/PropertyPanel';
 import { ClippingPanel } from './ui/ClippingPanel';
@@ -122,6 +123,14 @@ async function main(): Promise<void> {
   const initBounds = architectureRoot ? new THREE.Box3().setFromObject(architectureRoot) : bounds;
   clipping.init(initBounds.isEmpty() ? bounds : initBounds);
   clipping.registerMaterials(collectMaterials(modelLoader.partRoots.values()));
+
+  // 断面キャップ（ステンシルベース）: 輪郭線(LineSegments)は対象外、実メッシュのみ登録する。
+  const clipStencil = new ClipStencil(scene.scene);
+  for (const root of modelLoader.partRoots.values()) {
+    root.traverse((o) => {
+      if (o instanceof THREE.Mesh) clipStencil.registerMesh(o);
+    });
+  }
 
   // --- UI 結線 --------------------------------------------------------------
   const tree = new ModelTree(treeEl, layers, data.metadata);
@@ -274,6 +283,7 @@ async function main(): Promise<void> {
   scene.start(() => camera.active, () => {
     camera.update();
     updateScaleBar();
+    clipStencil.update(clipping.getActivePlanes());
   });
   console.log(`[viewer] loaded ${project} rev=${data.manifest.revision}`);
 }

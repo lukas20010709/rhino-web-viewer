@@ -7,12 +7,11 @@ import * as THREE from 'three';
  *
  * 断面（Clipping）は Clipping.ts が登録済みマテリアルの clippingPlanes を
  * 直接書き換えるだけで実現する（renderer.localClippingEnabled=true、以下で設定）。
- * 過去に断面キャップ（切断面を塗りつぶす近似平面）を追加したことがあったが、
- * モデル境界サイズの単色平面をそのままキャップとして描画する実装だったため、
- * 実際の断面形状（中空/非中空の区別）を反映できず、壁の内側等の空洞部分まで
- * 塗りつぶして中が見えなくなる問題があった。正しい断面キャップにはステンシル
- * バッファ等を用いた実ジオメトリ形状のキャップ描画が必要で、単純な単色平面では
- * 実現できないため撤去し、素のクリッピング（中空部分は見えたまま）に戻した。
+ * 断面キャップ（切断面の塗りつぶし）自体は ClipStencil.ts が担当し、
+ * ステンシルバッファで実ジオメトリの断面形状（中空/非中空の区別）に沿って
+ * 描画する（モデル境界サイズの単色平面で近似していた旧実装は、中空部分まで
+ * 塗りつぶしてしまう問題があり撤去済み）。Scene はステンシルバッファを
+ * 使えるようレンダラーを構成するだけで、キャップ自体の中身は関知しない。
  */
 export class Scene {
   readonly scene = new THREE.Scene();
@@ -22,7 +21,8 @@ export class Scene {
   private running = false;
 
   constructor(canvas: HTMLCanvasElement) {
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    // stencil: true はステンシルバッファを使う断面キャップ（ClipStencil.ts）に必要。
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, stencil: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     // Clipping（Section基盤 / Phase 4）を有効化しておく。

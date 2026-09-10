@@ -69,7 +69,8 @@ export class Clipping {
     this.apply();
   }
 
-  private activePlanes(): THREE.Plane[] {
+  /** 現在有効な断面平面の配列（X/Y/Z軸のうちenabledなもののみ、最大3枚）を返す。 */
+  getActivePlanes(): THREE.Plane[] {
     const planes: THREE.Plane[] = [];
     (Object.keys(this.state) as ClipAxis[]).forEach((axis) => {
       const s = this.state[axis];
@@ -83,10 +84,11 @@ export class Clipping {
   }
 
   private apply(): void {
-    const planes = this.activePlanes();
+    const planes = this.getActivePlanes();
     // 契約: 登録済みマテリアルには常に（0枚でも）同一参照のclippingPlanes配列を設定する。
-    // Scene.ts の断面キャップ同期（Clipping Cap）はこの参照の変化を手がかりに再構築するため、
-    // 各マテリアルへ個別配列を割り当てたり未設定のままにしたりしないこと。
+    // main.ts の ClipStencil（断面キャップ）は毎フレーム getActivePlanes() を呼び直して
+    // 同期するため、この配列自体の参照一致は必須ではないが、登録済みマテリアルには
+    // 個別配列を割り当てたり未設定のままにしたりしないこと（描画結果が一貫しなくなる）。
     for (const m of this.materials) {
       m.clippingPlanes = planes;
       m.clipShadows = planes.length > 0;
