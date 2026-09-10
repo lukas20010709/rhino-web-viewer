@@ -34,6 +34,32 @@ function collectMaterials(roots: Iterable<THREE.Object3D>): THREE.Material[] {
   return [...set];
 }
 
+/**
+ * 断面キャップ(ClipStencil)の登録対象を集める。
+ * 単一マテリアルのRhinoオブジェクトはそのままMeshとして1個体（ClipStencil.registerMesh）。
+ * 面ごとに別マテリアルを持つオブジェクトはglTFエクスポート時に「子が全てMeshの
+ * Group」（例: 柱・梁・壁が断片化されたもの）として現れるため、その断片群を
+ * まとめて1個体（ClipStencil.registerGroup、内部でジオメトリを結合し水密性を
+ * 復元する）として登録する。子孫を再帰的に辿るが、上記いずれかに該当したノードの
+ * 配下はそれ以上潜らない（Mesh/断片Groupの内部にLineSegments等が入っていても
+ * 二重登録しない）。
+ */
+function registerClipStencilTargets(root: THREE.Object3D, clipStencil: ClipStencil): void {
+  const visit = (node: THREE.Object3D): void => {
+    if (node instanceof THREE.Mesh) {
+      clipStencil.registerMesh(node);
+      return;
+    }
+    const meshChildren = node.children.filter((c) => c instanceof THREE.Mesh);
+    if (node.children.length > 0 && meshChildren.length === node.children.length) {
+      clipStencil.registerGroup(node as THREE.Group);
+      return;
+    }
+    for (const child of node.children) visit(child);
+  };
+  visit(root);
+}
+
 // main() の各 await 完了前は画面がキャンバス背景のみになるため、読み込み中である
 // ことを示すインジケーターを表示する。main().catch() からも消去できるよう
 // モジュールスコープで参照を保持する。
@@ -215,9 +241,7 @@ async function loadViewer(project: string): Promise<void> {
   // 断面キャップ（ステンシルベース）: 輪郭線(LineSegments)は対象外、実メッシュのみ登録する。
   const clipStencil = new ClipStencil(scene.scene);
   for (const root of modelLoader.partRoots.values()) {
-    root.traverse((o) => {
-      if (o instanceof THREE.Mesh) clipStencil.registerMesh(o);
-    });
+    registerClipStencilTargets(root, clipStencil);
   }
 
   // --- UI 結線 --------------------------------------------------------------

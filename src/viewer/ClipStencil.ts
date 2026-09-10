@@ -80,24 +80,61 @@ function getBaseHatchTexture(color: THREE.Color): THREE.CanvasTexture {
  * キャップ用の平面（境界球の2.5倍という実断面よりかなり大きいサイズ）の
  * ほぼ全域が非0と判定されて広範囲に誤ってハッチングされてしまう）。
  *
- * 実際に一部のRhinoオブジェクト（面ごとに個別マテリアルを持つ柱・梁など）は
+ * 実際に一部のRhinoオブジェクト（面ごとに個別マテリアルを持つ柱・梁・壁など）は
  * glTFエクスポート時に面ごとの単一メッシュ（開いた1枚板、例: 4頂点の矩形面）に
- * 分割されることがあり、その各断片は単体では水密でない。水密性はメッシュの
- * すべての辺がちょうど2枚の三角形に共有されているか（2-manifold・境界辺なし）
- * で判定する。開いた断片はキャップ登録自体をスキップする（見た目は断面が
- * 塗りつぶされず開いたままになるが、画面の大部分が誤ハッチングされるより
+ * 分割される。分割前は1つの水密ソリッドだったはずなので、同じ親（Group）配下の
+ * 断片をすべて結合すれば再び閉じた形状に戻る（下のmergeFragmentGeometries参照、
+ * main.ts側で親Groupごとまとめてregisterする）。この関数はその結合後の最終的な
+ * ジオメトリに対する保険的な検査で、すべての辺がちょうど2枚の三角形に共有されて
+ * いるか（2-manifold・境界辺なし）を見る。結合しても水密にならない断片（本当に
+ * 開いた形状、または非水密の修復漏れ）はキャップ登録自体をスキップする（見た目は
+ * 断面が塗りつぶされず開いたままになるが、画面の大部分が誤ハッチングされるより
  * 実害が小さい）。
+ *
+ * 判定基準は「すべての辺の共有数が偶数」であることで、厳密な2-manifold（常に2枚）
+ * より緩い。表裏面カウント方式は、ある辺を2枚が共有していれば増減が相殺されるため、
+ * 実測では一部の辺が4枚・6枚（微小な重複・欠片ポリゴン起因、実データで確認済み）に
+ * なっていても内外判定の0/非0自体は崩れない。崩れるのは奇数（典型的には1＝本当に
+ * 開いた境界辺）の場合のみなので、そこだけを不合格とする。
+ *
+ * 辺の共有判定はインデックスの一致ではなく座標（量子化した位置）の一致で行う。
+ * ハードエッジ（面ごとに法線を分けるフラットシェーディング）で書き出された
+ * メッシュは、位置が同じでも面ごとに別頂点として重複しているのが通常で、単純に
+ * インデックス値で辺を比較すると、単体で正しく閉じているソリッド（例:
+ * 24頂点=6面×4頂点のハードエッジ直方体）まで「境界辺あり」と誤判定してしまう。
  */
+function weldPositionIndices(position: THREE.BufferAttribute | THREE.InterleavedBufferAttribute): Uint32Array {
+  const EPS = 1e-4;
+  const canonical = new Map<string, number>();
+  const remap = new Uint32Array(position.count);
+  for (let i = 0; i < position.count; i++) {
+    const x = Math.round(position.getX(i) / EPS);
+    const y = Math.round(position.getY(i) / EPS);
+    const z = Math.round(position.getZ(i) / EPS);
+    const key = `${x}_${y}_${z}`;
+    const existing = canonical.get(key);
+    if (existing !== undefined) {
+      remap[i] = existing;
+    } else {
+      canonical.set(key, i);
+      remap[i] = i;
+    }
+  }
+  return remap;
+}
+
 function isWatertight(geometry: THREE.BufferGeometry): boolean {
   const index = geometry.index;
-  if (!index) return false;
+  const position = geometry.attributes.position;
+  if (!index || !position) return false;
 
+  const remap = weldPositionIndices(position);
   const edgeCounts = new Map<string, number>();
   const count = index.count;
   for (let i = 0; i < count; i += 3) {
-    const ia = index.getX(i);
-    const ib = index.getX(i + 1);
-    const ic = index.getX(i + 2);
+    const ia = remap[index.getX(i)];
+    const ib = remap[index.getX(i + 1)];
+    const ic = remap[index.getX(i + 2)];
     const edges: [number, number][] = [
       [ia, ib],
       [ib, ic],
@@ -109,10 +146,64 @@ function isWatertight(geometry: THREE.BufferGeometry): boolean {
     }
   }
 
+  // 実データでは、本当に断片化されて開いたオブジェクト（例: 面ごとに分割された
+  // 1枚板の集まりで、境界辺の割合がほぼ100%）と、大部分は閉じているが補修漏れの
+  // 小さな穴が数枚だけ残るオブジェクト（境界辺の割合は1%未満）の両方が存在する。
+  // 後者まで一律にキャップを諦めると、実害の小さい局所的な欠陥のせいで壁全体の
+  // ハッチングが消えてしまう（このガードを追加した経緯そのもの）。境界辺の比率が
+  // 閾値未満なら、局所的な小さい欠陥として許容してキャップ対象にする。
+  let oddCount = 0;
   for (const c of edgeCounts.values()) {
-    if (c !== 2) return false;
+    if (c % 2 !== 0) oddCount++;
   }
-  return edgeCounts.size > 0;
+  if (edgeCounts.size === 0) return false;
+  const OPEN_EDGE_RATIO_TOLERANCE = 0.02;
+  return oddCount / edgeCounts.size < OPEN_EDGE_RATIO_TOLERANCE;
+}
+
+/**
+ * 同一オブジェクトが面ごとの別マテリアルでglTF分割された断片群（isWatertight参照）を
+ * 1つのジオメトリに結合する。断片は共通の親Group直下で全てローカル変換が単位行列
+ * （position/quaternion/scaleが既定値）であることを前提とし、position/indexだけを
+ * 単純連結する（キャップ生成に法線・UV等は使わないため結合しない）。
+ */
+function mergeFragmentGeometries(meshes: THREE.Mesh[]): THREE.BufferGeometry | null {
+  let totalVerts = 0;
+  let totalIndices = 0;
+  for (const m of meshes) {
+    const pos = m.geometry.attributes.position;
+    if (!pos) return null;
+    totalVerts += pos.count;
+    totalIndices += m.geometry.index ? m.geometry.index.count : pos.count;
+  }
+  if (totalVerts === 0) return null;
+
+  const positions = new Float32Array(totalVerts * 3);
+  const indices = new Uint32Array(totalIndices);
+  let vertOffset = 0;
+  let indexOffset = 0;
+  for (const m of meshes) {
+    const pos = m.geometry.attributes.position;
+    for (let v = 0; v < pos.count; v++) {
+      positions[(vertOffset + v) * 3] = pos.getX(v);
+      positions[(vertOffset + v) * 3 + 1] = pos.getY(v);
+      positions[(vertOffset + v) * 3 + 2] = pos.getZ(v);
+    }
+    const index = m.geometry.index;
+    if (index) {
+      for (let i = 0; i < index.count; i++) indices[indexOffset + i] = index.getX(i) + vertOffset;
+      indexOffset += index.count;
+    } else {
+      for (let i = 0; i < pos.count; i++) indices[indexOffset + i] = i + vertOffset;
+      indexOffset += pos.count;
+    }
+    vertOffset += pos.count;
+  }
+
+  const merged = new THREE.BufferGeometry();
+  merged.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  merged.setIndex(new THREE.BufferAttribute(indices, 1));
+  return merged;
 }
 
 interface AxisSlot {
@@ -125,7 +216,10 @@ interface AxisSlot {
 }
 
 interface Entry {
-  mesh: THREE.Mesh;
+  /** 可視判定（isEffectivelyVisible）とワールド変換の基準。単体Meshまたは断片をまとめたGroup。 */
+  target: THREE.Object3D;
+  /** キャップのマスク描画・境界球計算に使うジオメトリ（Groupの場合はmergeFragmentGeometriesの結合結果）。 */
+  geometry: THREE.BufferGeometry;
   slots: AxisSlot[];
 }
 
@@ -161,11 +255,38 @@ export class ClipStencil {
 
     const capColor = (material as THREE.MeshStandardMaterial).color?.clone() ?? new THREE.Color(0xcccccc);
     mesh.updateWorldMatrix(true, false);
+    this.registerTarget(mesh, mesh.geometry, capColor);
+  }
 
+  /**
+   * 面ごとの別マテリアルでglTF分割された断片群（同一オブジェクトの子Mesh一式）を
+   * 1つのGroupとして登録する。分割前は1つの水密ソリッドだったはずなので、
+   * mergeFragmentGeometriesで結合してから断面キャップの対象にする（main.ts側で
+   * 「子が全てMeshであるGroup」を検出して呼び出す）。
+   */
+  registerGroup(group: THREE.Group): void {
+    const meshes = group.children.filter((c): c is THREE.Mesh => c instanceof THREE.Mesh);
+    if (meshes.length === 0) return;
+
+    const merged = mergeFragmentGeometries(meshes);
+    if (!merged || !isWatertight(merged)) return;
+
+    // キャップの色は分割前の単一マテリアル色を再現できないため、断片の先頭の色で代表する。
+    const firstMaterial = meshes[0].material;
+    const capColor =
+      !Array.isArray(firstMaterial) && (firstMaterial as THREE.MeshStandardMaterial)?.color
+        ? (firstMaterial as THREE.MeshStandardMaterial).color.clone()
+        : new THREE.Color(0xcccccc);
+
+    group.updateWorldMatrix(true, false);
+    this.registerTarget(group, merged, capColor);
+  }
+
+  private registerTarget(target: THREE.Object3D, geometry: THREE.BufferGeometry, capColor: THREE.Color): void {
     // ハッチングの繰り返し数はメッシュごとに一定（キャップの実寸サイズはupdate()内の
     // 計算と同じ式で、境界球はジオメトリ由来なので毎フレーム変わらない）。
-    mesh.geometry.computeBoundingSphere();
-    const capSize = Math.max((mesh.geometry.boundingSphere?.radius ?? 1) * 2.5, 0.05);
+    geometry.computeBoundingSphere();
+    const capSize = Math.max((geometry.boundingSphere?.radius ?? 1) * 2.5, 0.05);
     // タイル1枚にはHATCH_LINES_PER_TILE本の線が入っているため、線1本あたりの実寸間隔を
     // HATCH_WORLD_SPACINGに揃えるにはタイル自体の実寸をその本数倍にする必要がある
     // （でないと線間隔がHATCH_LINES_PER_TILE分の1に詰まってしまう）。
@@ -198,16 +319,16 @@ export class ClipStencil {
         stencilZPass: THREE.DecrementWrapStencilOp,
       });
 
-      const maskBack = new THREE.Mesh(mesh.geometry, maskBackMaterial);
-      const maskFront = new THREE.Mesh(mesh.geometry, maskFrontMaterial);
+      const maskBack = new THREE.Mesh(geometry, maskBackMaterial);
+      const maskFront = new THREE.Mesh(geometry, maskFrontMaterial);
       maskBack.renderOrder = renderOrder;
       maskFront.renderOrder = renderOrder;
       maskBack.visible = false;
       maskFront.visible = false;
       maskBack.matrixAutoUpdate = false;
       maskFront.matrixAutoUpdate = false;
-      maskBack.matrix.copy(mesh.matrixWorld);
-      maskFront.matrix.copy(mesh.matrixWorld);
+      maskBack.matrix.copy(target.matrixWorld);
+      maskFront.matrix.copy(target.matrixWorld);
 
       // キャップはメッシュ自身のマテリアル色から生成したハッチングテクスチャを貼る
       // （建築断面図の慣習に倣い、単色塗りつぶしではなく断面であることを示す）。
@@ -245,7 +366,7 @@ export class ClipStencil {
       slots.push({ maskBack, maskFront, maskBackMaterial, maskFrontMaterial, cap, capMaterial });
     }
 
-    this.entries.push({ mesh, slots });
+    this.entries.push({ target, geometry, slots });
   }
 
   /** 有効な断面平面（Clipping.activePlanes()と同じ配列、最大3=X/Y/Z）に応じて再同期する。 */
@@ -255,7 +376,7 @@ export class ClipStencil {
       // partルート（Layers.tsがvisibleを切り替える）から独立している。そのため
       // レイヤー非表示時もここで明示的に隠さないと、非表示パートの断面だけが
       // 透けて見えてしまう。祖先を辿って実効的な表示状態を判定する。
-      if (!isEffectivelyVisible(entry.mesh)) {
+      if (!isEffectivelyVisible(entry.target)) {
         entry.slots.forEach((slot) => {
           slot.maskBack.visible = false;
           slot.maskFront.visible = false;
@@ -264,7 +385,7 @@ export class ClipStencil {
         continue;
       }
 
-      const geometry = entry.mesh.geometry;
+      const geometry = entry.geometry;
       geometry.computeBoundingSphere();
       const sphere = geometry.boundingSphere;
 
@@ -282,7 +403,7 @@ export class ClipStencil {
         slot.maskFrontMaterial.clippingPlanes = [plane, ...others];
         slot.capMaterial.clippingPlanes = others;
 
-        const worldCenter = sphere.center.clone().applyMatrix4(entry.mesh.matrixWorld);
+        const worldCenter = sphere.center.clone().applyMatrix4(entry.target.matrixWorld);
         const size = Math.max(sphere.radius * 2.5, 0.05);
 
         const up = new THREE.Vector3(0, 0, 1);
