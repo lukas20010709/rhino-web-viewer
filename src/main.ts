@@ -109,7 +109,18 @@ async function main(): Promise<void> {
   // カメラと一致するようにする（固定参照だとOrtho切替後に選択が誤ヒットする）。
   const selection = new Selection(() => camera.active, scene.scene, data.metadata);
   const clipping = new Clipping();
-  clipping.init(bounds);
+  // 断面位置の初期値は「建築(architecture)」パートの中心を優先する。
+  // モデル全体(bounds)には敷地(site)・外構(landscape)等、建物より大きく広がりがちな
+  // パートが含まれるため、全体の中心で初期化すると、敷地・外構を含む広い範囲の中心が
+  // 実際の建物の外形とずれる場合がある（実クリッピング自体は常に正しく機能する。
+  // 見た目上「何も切れていないように見える」原因は、対称な形状をちょうど中心で
+  // 切ると既定のアイソメ視点からは差が分かりにくいこと、または敷地が建物より広い
+  // ケースで既定位置が建物の端付近に来てしまうことの複合。断面位置を建築パートの
+  // 中心に寄せておくことで、後者のケースを避け、建物側を基準にした初期表示にする）。
+  // スライダーの可動範囲自体は引き続きモデル全体(bounds)を使う（敷地側もドラッグで切断可能）。
+  const architectureRoot = modelLoader.partRoots.get('architecture');
+  const initBounds = architectureRoot ? new THREE.Box3().setFromObject(architectureRoot) : bounds;
+  clipping.init(initBounds.isEmpty() ? bounds : initBounds);
   clipping.registerMaterials(collectMaterials(modelLoader.partRoots.values()));
 
   // --- UI 結線 --------------------------------------------------------------
