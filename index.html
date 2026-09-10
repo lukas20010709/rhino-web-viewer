@@ -21,7 +21,15 @@
         color: #1c2126;
         pointer-events: auto;
       }
-      #tree { top: 12px; left: 12px; padding: 10px 12px; max-height: 45vh; overflow: auto; min-width: 150px; }
+      /* モデルツリーの上に配置するURLコピー・ボタン。#treeはその分だけ下げる。 */
+      #copy-url-btn {
+        position: absolute; top: 12px; left: 12px; z-index: 5;
+        font: inherit; font-size: 12px; padding: 6px 10px; border: 1px solid #c3c7cd;
+        background: #fff; border-radius: 6px; cursor: pointer; color: #1c2126;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+      }
+      #copy-url-btn:hover { background: #eef1f4; }
+      #tree { top: 52px; left: 12px; padding: 10px 12px; max-height: 45vh; overflow: auto; min-width: 150px; }
       #tree h3, #props h3, #clip h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #5b6470; }
       #tree label { display: block; padding: 4px 0; cursor: pointer; user-select: none; }
       #props { top: 12px; right: 12px; padding: 10px 12px; min-width: 200px; max-width: 320px; max-height: 60vh; overflow: auto; }
@@ -41,11 +49,26 @@
       #toolbar button:hover { background: #eef1f4; }
       #toolbar button[aria-pressed="true"] { background: #1c2126; color: #fff; border-color: #1c2126; }
       #clip { left: 12px; bottom: 14px; padding: 10px 12px; min-width: 240px; }
-      /* 平行投影時のみ表示するスケールバー（右下）。 */
+
+      /* スクリーンショット用カメラアイコン（右下の丸ボタン）。
+         :not([hidden])に限定する理由は#scalebar/#toolbarと同じ（IDセレクタのdisplay指定が
+         [hidden]の既定display:noneを上書きしてしまうため）。 */
+      #screenshot-btn:not([hidden]) {
+        position: absolute; right: 12px; bottom: 14px; z-index: 5;
+        width: 42px; height: 42px; padding: 0;
+        border: 1px solid #c3c7cd; border-radius: 50%;
+        background: #fff; cursor: pointer; color: #1c2126;
+        display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+      }
+      #screenshot-btn:hover { background: #eef1f4; }
+      #screenshot-btn svg { width: 20px; height: 20px; display: block; }
+
+      /* 平行投影時のみ表示するスケールバー（右下）。カメラアイコンの分だけ上にずらす。 */
       /* IDセレクタはUAスタイルの[hidden]{display:none}より詳細度が高く、display指定が
          あるとhidden属性を上書きしてしまう（非表示時も小さな空箱が常時表示・操作可能に
          なっていた）。:not([hidden])に限定してhidden時はUAスタイル側に委ねる。 */
-      #scalebar:not([hidden]) { right: 12px; bottom: 14px; padding: 8px 12px; display: flex; align-items: center; gap: 8px; }
+      #scalebar:not([hidden]) { right: 12px; bottom: 64px; padding: 8px 12px; display: flex; align-items: center; gap: 8px; }
       #scalebar .scalebar-bar { height: 6px; border-left: 2px solid #1c2126; border-right: 2px solid #1c2126; border-bottom: 2px solid #1c2126; }
       #scalebar .scalebar-label { font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
       #clip .clip-row { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
@@ -56,6 +79,32 @@
         background: #fff; border-radius: 4px; cursor: pointer; color: #1c2126;
       }
       #clip .clip-row button:hover { background: #eef1f4; }
+
+      /* 表示スタイル（通常/ワイヤーフレーム/Xレイ/モノクロ）を切り替えるドロワー。
+         右端からスライドインし、トリガーボタン（ツールバー内「表示スタイル」）で開閉する。 */
+      .style-drawer {
+        top: 0; right: 0; height: 100%; width: min(240px, 80vw);
+        border-radius: 0; border-top: none; border-right: none; border-bottom: none;
+        box-sizing: border-box; padding: 20px 16px;
+        display: flex; flex-direction: column; gap: 8px;
+        transform: translateX(100%);
+        transition: transform 0.2s ease;
+        z-index: 15;
+      }
+      .style-drawer.open { transform: translateX(0); }
+      .style-drawer h3 { margin: 8px 0 4px; }
+      #style-options { display: flex; flex-direction: column; gap: 8px; }
+      .style-drawer .drawer-close {
+        position: absolute; top: 10px; right: 10px;
+        border: none; background: none; font-size: 18px; line-height: 1;
+        cursor: pointer; color: #5b6470; padding: 6px;
+      }
+      .style-drawer .style-option {
+        font: inherit; font-size: 13px; padding: 10px 12px; border: 1px solid #c3c7cd;
+        background: #fff; border-radius: 6px; cursor: pointer; color: #1c2126; text-align: left;
+      }
+      .style-drawer .style-option:hover { background: #eef1f4; }
+      .style-drawer .style-option[aria-pressed="true"] { background: #1c2126; color: #fff; border-color: #1c2126; }
 
       /* ホーム画面（?project=未指定時）: プロジェクト選択カード一覧。 */
       .home-panel {
@@ -128,6 +177,7 @@
   <body>
     <div id="app">
       <canvas id="viewer"></canvas>
+      <button id="copy-url-btn" type="button">URLをコピー</button>
       <aside id="tree" class="panel" aria-label="モデルツリー"></aside>
       <aside id="props" class="panel" aria-label="プロパティパネル"></aside>
       <aside id="clip" class="panel" aria-label="断面"></aside>
@@ -135,7 +185,18 @@
         <div class="scalebar-bar"></div>
         <div class="scalebar-label"></div>
       </aside>
+      <button id="screenshot-btn" type="button" aria-label="スクリーンショットを保存">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+          <circle cx="12" cy="13" r="4"></circle>
+        </svg>
+      </button>
       <nav id="toolbar" class="panel" aria-label="ツールバー"></nav>
+      <aside id="style-drawer" class="panel style-drawer" aria-label="表示スタイル">
+        <button class="drawer-close" type="button" aria-label="閉じる">×</button>
+        <h3>表示スタイル</h3>
+        <div id="style-options"></div>
+      </aside>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

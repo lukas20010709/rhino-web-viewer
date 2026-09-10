@@ -76,7 +76,7 @@ interface ProjectIndex {
 async function renderHome(): Promise<void> {
   // ビューワ用の既存パネル（loadViewerが中身を組み立てる前提）は、ホーム画面では
   // 空のまま表示されてしまう（padding分の空箱が見える）ため、ここで明示的に隠す。
-  for (const id of ['tree', 'props', 'clip', 'scalebar', 'toolbar']) {
+  for (const id of ['tree', 'props', 'clip', 'scalebar', 'toolbar', 'copy-url-btn', 'screenshot-btn', 'style-drawer']) {
     const el = document.getElementById(id);
     if (el) el.hidden = true;
   }
@@ -305,7 +305,8 @@ async function loadViewer(project: string): Promise<void> {
 
   addButton('リセット', resetAll);
 
-  const copyUrlBtn = addButton('URLをコピー', () => {
+  const copyUrlBtn = document.getElementById('copy-url-btn') as HTMLButtonElement;
+  copyUrlBtn.addEventListener('click', () => {
     if (!navigator.clipboard) {
       console.error('[viewer] clipboard API unavailable (requires HTTPS or localhost)');
       copyUrlBtn.textContent = 'コピー不可';
@@ -334,7 +335,7 @@ async function loadViewer(project: string): Promise<void> {
       });
   });
 
-  // --- 表示スタイル（通常/ワイヤーフレーム/Xレイ/モノクロ） -----------------
+  // --- 表示スタイル（通常/ワイヤーフレーム/Xレイ/モノクロ）: ドロワー表示 ----
   const displayStyle = new DisplayStyle();
   const styleModes: { mode: DisplayStyleMode; label: string }[] = [
     { mode: 'normal', label: '通常' },
@@ -349,12 +350,32 @@ async function loadViewer(project: string): Promise<void> {
     for (const [m, btn] of styleButtons) btn.setAttribute('aria-pressed', String(m === mode));
   };
 
+  const styleDrawer = document.getElementById('style-drawer') as HTMLElement;
+  const styleOptionsEl = document.getElementById('style-options') as HTMLElement;
+
+  let styleTriggerBtn: HTMLButtonElement;
+  const setDrawerOpen = (open: boolean): void => {
+    styleDrawer.classList.toggle('open', open);
+    styleTriggerBtn.setAttribute('aria-pressed', String(open));
+  };
+  styleTriggerBtn = addButton('表示スタイル', () => setDrawerOpen(!styleDrawer.classList.contains('open')));
+
   for (const { mode, label } of styleModes) {
-    styleButtons.set(mode, addButton(label, () => setStyleMode(mode)));
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'style-option';
+    btn.textContent = label;
+    btn.addEventListener('click', () => setStyleMode(mode));
+    styleOptionsEl.appendChild(btn);
+    styleButtons.set(mode, btn);
   }
   setStyleMode('normal'); // 既定は通常表示（起動直後は見た目に変化なし）
 
-  addButton('スクリーンショット', () => {
+  styleDrawer.querySelector('.drawer-close')?.addEventListener('click', () => setDrawerOpen(false));
+
+  // --- スクリーンショット（右下のカメラアイコン） --------------------------
+  const screenshotBtn = document.getElementById('screenshot-btn') as HTMLButtonElement;
+  screenshotBtn.addEventListener('click', () => {
     canvas.toBlob((blob) => {
       if (!blob) {
         console.error('[viewer] screenshot failed: toBlob returned null');
@@ -383,6 +404,7 @@ async function loadViewer(project: string): Promise<void> {
       case 'Escape':
         selection.deselect();
         props.show(null);
+        setDrawerOpen(false);
         break;
       case 'f': case 'F':
         setView('perspective');
