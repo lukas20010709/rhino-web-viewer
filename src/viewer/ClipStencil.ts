@@ -88,6 +88,16 @@ interface Entry {
   slots: AxisSlot[];
 }
 
+/** object自身と祖先すべてのvisibleを辿った実効的な表示状態（three.jsのレンダラ判定と同じ意味）。 */
+function isEffectivelyVisible(object: THREE.Object3D): boolean {
+  let current: THREE.Object3D | null = object;
+  while (current) {
+    if (!current.visible) return false;
+    current = current.parent;
+  }
+  return true;
+}
+
 const MAX_SIMULTANEOUS_PLANES = 3;
 
 export class ClipStencil {
@@ -198,6 +208,19 @@ export class ClipStencil {
   /** 有効な断面平面（Clipping.activePlanes()と同じ配列、最大3=X/Y/Z）に応じて再同期する。 */
   update(planes: THREE.Plane[]): void {
     for (const entry of this.entries) {
+      // マスク/キャップは専用コンテナ（__clipStencil）配下にあり、元メッシュの
+      // partルート（Layers.tsがvisibleを切り替える）から独立している。そのため
+      // レイヤー非表示時もここで明示的に隠さないと、非表示パートの断面だけが
+      // 透けて見えてしまう。祖先を辿って実効的な表示状態を判定する。
+      if (!isEffectivelyVisible(entry.mesh)) {
+        entry.slots.forEach((slot) => {
+          slot.maskBack.visible = false;
+          slot.maskFront.visible = false;
+          slot.cap.visible = false;
+        });
+        continue;
+      }
+
       const geometry = entry.mesh.geometry;
       geometry.computeBoundingSphere();
       const sphere = geometry.boundingSphere;
