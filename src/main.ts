@@ -249,6 +249,7 @@ async function loadViewer(project: string): Promise<void> {
   const setView = (view: StandardView): void => {
     currentView = view;
     camera.applyStandardView(view, bounds);
+    updateViewButtons();
   };
 
   const resetAll = (): void => {
@@ -283,24 +284,65 @@ async function loadViewer(project: string): Promise<void> {
     return btn;
   };
 
-  addButton('ホームに戻る', () => {
+  /** アイコンのみのボタン。ラベルは視覚的には出さずtitle/aria-labelで保持する（ツールチップ・スクリーンリーダー向け）。 */
+  const addIconButton = (label: string, svgInner: string, onClick: () => void): HTMLButtonElement => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'icon-btn';
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${svgInner}</svg>`;
+    btn.addEventListener('click', onClick);
+    toolbarEl.appendChild(btn);
+    return btn;
+  };
+
+  const VIEW_ICONS: Record<StandardView, string> = {
+    // 「ホームに戻る」の家アイコンと紛らわしいため、全体表示は四隅を広げる
+    // 「フィット/最大化」アイコンにする（家アイコンは使わない）。
+    perspective:
+      '<path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/>' +
+      '<path d="M21 16v3a2 2 0 0 1-2 2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/>',
+    top: '<rect x="4" y="10" width="16" height="10" rx="1"/><path d="M12 2v6M9 5l3 3 3-3"/>',
+    // スクリーンショット用カメラアイコン（丸=レンズ）と紛らわしいため、正面は
+    // 円を使わずパネル状の矩形（縦の仕切り線）にする。
+    front: '<rect x="5" y="4" width="14" height="16" rx="1"/><path d="M9 4v16M15 4v16"/>',
+    side: '<rect x="9" y="3" width="6" height="18" rx="1"/><path d="M1 12h5M3 9l-2 3 2 3"/>',
+  };
+  const VIEW_LABELS: Record<StandardView, string> = {
+    perspective: '全体表示', top: '上面', front: '正面', side: '側面',
+  };
+  const PROJECTION_ICONS = {
+    // 透視投影(収束する線=三角)/平行投影(収束しない=四角)を視覚的に表す。
+    perspective: '<path d="M12 3L4 20h16z"/>',
+    orthographic: '<rect x="4" y="4" width="16" height="16"/>',
+  } satisfies Record<typeof projection, string>;
+
+  addIconButton('ホームに戻る', '<path d="M3 12l9-9 9 9M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"/>', () => {
     location.href = import.meta.env.BASE_URL;
   });
 
-  addButton('全体表示', () => setView('perspective'));
-  addButton('上面', () => setView('top'));
-  addButton('正面', () => setView('front'));
-  addButton('側面', () => setView('side'));
+  const viewButtons = new Map<StandardView, HTMLButtonElement>();
+  const updateViewButtons = (): void => {
+    for (const [v, btn] of viewButtons) btn.setAttribute('aria-pressed', String(v === currentView));
+  };
+  for (const view of ['perspective', 'top', 'front', 'side'] as const) {
+    viewButtons.set(view, addIconButton(VIEW_LABELS[view], VIEW_ICONS[view], () => setView(view)));
+  }
+  updateViewButtons(); // 既定/URL復元済みのcurrentViewを反映（setView経由でない初期状態のため）
 
-  const projBtn = addButton('平行投影', () => {
+  const projBtn = addIconButton('平行投影', PROJECTION_ICONS[projection], () => {
     projection = projection === 'perspective' ? 'orthographic' : 'perspective';
     camera.setProjection(projection);
     camera.applyStandardView(currentView, bounds); // 新カメラで同じ構図に再フィット
-    projBtn.textContent = projection === 'perspective' ? '平行投影' : '透視投影';
+    projBtn.title = projection === 'perspective' ? '平行投影' : '透視投影';
+    projBtn.setAttribute('aria-label', projBtn.title);
+    projBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${PROJECTION_ICONS[projection]}</svg>`;
     projBtn.setAttribute('aria-pressed', String(projection === 'orthographic'));
     updateScaleBar();
   });
-  projBtn.textContent = projection === 'perspective' ? '平行投影' : '透視投影';
+  projBtn.title = projection === 'perspective' ? '平行投影' : '透視投影';
+  projBtn.setAttribute('aria-label', projBtn.title);
   projBtn.setAttribute('aria-pressed', String(projection === 'orthographic'));
 
   addButton('リセット', resetAll);
