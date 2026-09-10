@@ -74,6 +74,47 @@ function getBaseHatchTexture(color: THREE.Color): THREE.CanvasTexture {
   return texture;
 }
 
+/**
+ * 断面キャップのステンシル手法（表裏面のIncr/Decr計数）は、対象メッシュが
+ * 閉じた水密ソリッドであることが前提（open shellでは表裏の計数が相殺されず、
+ * キャップ用の平面（境界球の2.5倍という実断面よりかなり大きいサイズ）の
+ * ほぼ全域が非0と判定されて広範囲に誤ってハッチングされてしまう）。
+ *
+ * 実際に一部のRhinoオブジェクト（面ごとに個別マテリアルを持つ柱・梁など）は
+ * glTFエクスポート時に面ごとの単一メッシュ（開いた1枚板、例: 4頂点の矩形面）に
+ * 分割されることがあり、その各断片は単体では水密でない。水密性はメッシュの
+ * すべての辺がちょうど2枚の三角形に共有されているか（2-manifold・境界辺なし）
+ * で判定する。開いた断片はキャップ登録自体をスキップする（見た目は断面が
+ * 塗りつぶされず開いたままになるが、画面の大部分が誤ハッチングされるより
+ * 実害が小さい）。
+ */
+function isWatertight(geometry: THREE.BufferGeometry): boolean {
+  const index = geometry.index;
+  if (!index) return false;
+
+  const edgeCounts = new Map<string, number>();
+  const count = index.count;
+  for (let i = 0; i < count; i += 3) {
+    const ia = index.getX(i);
+    const ib = index.getX(i + 1);
+    const ic = index.getX(i + 2);
+    const edges: [number, number][] = [
+      [ia, ib],
+      [ib, ic],
+      [ic, ia],
+    ];
+    for (const [x, y] of edges) {
+      const key = x < y ? `${x}_${y}` : `${y}_${x}`;
+      edgeCounts.set(key, (edgeCounts.get(key) ?? 0) + 1);
+    }
+  }
+
+  for (const c of edgeCounts.values()) {
+    if (c !== 2) return false;
+  }
+  return edgeCounts.size > 0;
+}
+
 interface AxisSlot {
   maskBack: THREE.Mesh;
   maskFront: THREE.Mesh;
@@ -115,6 +156,8 @@ export class ClipStencil {
   registerMesh(mesh: THREE.Mesh): void {
     const material = mesh.material;
     if (Array.isArray(material) || !material || !mesh.geometry) return;
+    // 開いた断片（isWatertight参照）はステンシル手法の前提を満たさないため対象外にする。
+    if (!isWatertight(mesh.geometry)) return;
 
     const capColor = (material as THREE.MeshStandardMaterial).color?.clone() ?? new THREE.Color(0xcccccc);
     mesh.updateWorldMatrix(true, false);
