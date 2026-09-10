@@ -1,5 +1,6 @@
 {
   "projects": [
-    { "id": "hut-demo", "title": "小屋デモ" }
+    { "id": "hut-demo", "title": "小屋デモ" },
+    { "id": "toilet-nhn", "title": "トイレ" }
   ]
 }

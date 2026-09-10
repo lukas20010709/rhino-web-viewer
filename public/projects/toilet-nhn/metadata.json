@@ -1,0 +1,257 @@
+{
+  "schemaVersion": "1.0.0",
+  "project": "toilet-nhn",
+  "revision": "2026-09-10-v4",
+  "objects": {
+    "EQUIPMENT005": {
+      "id": "EQUIPMENT005",
+      "layer": "08_EQUIPMENT",
+      "category": "equipment"
+    },
+    "FURNITURE001": {
+      "id": "FURNITURE001",
+      "layer": "06_FURNITURE",
+      "category": "furniture"
+    },
+    "EQUIPMENT007": {
+      "id": "EQUIPMENT007",
+      "layer": "08_EQUIPMENT",
+      "category": "equipment"
+    },
+    "EQUIPMENT008": {
+      "id": "EQUIPMENT008",
+      "layer": "08_EQUIPMENT",
+      "category": "equipment"
+    },
+    "FURNITURE005": {
+      "id": "FURNITURE005",
+      "layer": "06_FURNITURE",
+      "category": "furniture"
+    },
+    "CEILING001": {
+      "id": "CEILING001",
+      "layer": "04_CEILING",
+      "category": "ceiling"
+    },
+    "EQUIPMENT024": {
+      "id": "EQUIPMENT024",
+      "layer": "08_EQUIPMENT",
+      "category": "equipment"
+    },
+    "EQUIPMENT022": {
+      "id": "EQUIPMENT022",
+      "layer": "08_EQUIPMENT",
+      "category": "equipment"
+    },
+    "EQUIPMENT004": {
+      "id": "EQUIPMENT004",
+      "layer": "08_EQUIPMENT",
+      "category": "equipment"
+    },
+    "EQUIPMENT009": {
+      "id": "EQUIPMENT009",
+      "layer": "08_EQUIPMENT",
+      "category": "equipment"
+    },
+    "EQUIPMENT012": {
+      "id": "EQUIPMENT012",
+      "layer": "08_EQUIPMENT",
+      "category": "equipment"
+    },
+    "EQUIPMENT015": {
+      "id": "EQUIPMENT015",
+      "layer": "08_EQUIPMENT",
+      "category": "equipment"
+    },
+    "EQUIPMENT002": {
+      "id": "EQUIPMENT002",
+      "layer": "08_EQUIPMENT",
+      "category": "equipment"
+    },
+    "EQUIPMENT014": {
+      "id": "EQUIPMENT014",
+      "layer": "08_EQUIPMENT",
+      "category": "equipment"
+    },
+    "EQUIPMENT011": {
+      "id": "EQUIPMENT011",
+      "layer": "08_EQUIPMENT",
+      "category": "equipment"
+    },
+    "EQUIPMENT006": {
+      "id": "EQUIPMENT006",
+      "layer": "08_EQUIPMENT",
+      "category": "equipment"
+    },
+    "EQUIPMENT001": {
+      "id": "EQUIPMENT001",
+      "layer": "08_EQUIPMENT",
+      "category": "equipment"
+    },
+    "EQUIPMENT020": {
+      "id": "EQUIPMENT020",
+      "layer": "08_EQUIPMENT",
+      "category": "equipment"
+    },
+    "EQUIPMENT021": {
+      "id": "EQUIPMENT021",
+      "layer": "08_EQUIPMENT",
+      "category": "equipment"
+    },
+    "EQUIPMENT017": {
+      "id": "EQUIPMENT017",
+      "layer": "08_EQUIPMENT",
+      "category": "equipment"
+    },
+    "EQUIPMENT023": {
+      "id": "EQUIPMENT023",
+      "layer": "08_EQUIPMENT",
+      "category": "equipment"
+    },
+    "EQUIPMENT003": {
+      "id": "EQUIPMENT003",
+      "layer": "08_EQUIPMENT",
+      "category": "equipment"
+    },
+    "EQUIPMENT010": {
+      "id": "EQUIPMENT010",
+      "layer": "08_EQUIPMENT",
+      "category": "equipment"
+    },
+    "EQUIPMENT019": {
+      "id": "EQUIPMENT019",
+      "layer": "08_EQUIPMENT",
+      "category": "equipment"
+    },
+    "EQUIPMENT018": {
+      "id": "EQUIPMENT018",
+      "layer": "08_EQUIPMENT",
+      "category": "equipment"
+    },
+    "EQUIPMENT016": {
+      "id": "EQUIPMENT016",
+      "layer": "08_EQUIPMENT",
+      "category": "equipment"
+    },
+    "EQUIPMENT013": {
+      "id": "EQUIPMENT013",
+      "layer": "08_EQUIPMENT",
+      "category": "equipment"
+    },
+    "FURNITURE007": {
+      "id": "FURNITURE007",
+      "layer": "06_FURNITURE",
+      "category": "furniture"
+    },
+    "FURNITURE011": {
+      "id": "FURNITURE011",
+      "layer": "06_FURNITURE",
+      "category": "furniture"
+    },
+    "FURNITURE010": {
+      "id": "FURNITURE010",
+      "layer": "06_FURNITURE",
+      "category": "furniture"
+    },
+    "FURNITURE003": {
+      "id": "FURNITURE003",
+      "layer": "06_FURNITURE",
+      "category": "furniture"
+    },
+    "FURNITURE004": {
+      "id": "FURNITURE004",
+      "layer": "06_FURNITURE",
+      "category": "furniture"
+    },
+    "FURNITURE008": {
+      "id": "FURNITURE008",
+      "layer": "06_FURNITURE",
+      "category": "furniture"
+    },
+    "FURNITURE006": {
+      "id": "FURNITURE006",
+      "layer": "06_FURNITURE",
+      "category": "furniture"
+    },
+    "WALL_A006": {
+      "id": "WALL_A006",
+      "layer": "03_WALL",
+      "category": "wall"
+    },
+    "WALL_A004": {
+      "id": "WALL_A004",
+      "layer": "03_WALL",
+      "category": "wall"
+    },
+    "WALL_A001": {
+      "id": "WALL_A001",
+      "layer": "03_WALL",
+      "category": "wall"
+    },
+    "WALL_A005": {
+      "id": "WALL_A005",
+      "layer": "03_WALL",
+      "category": "wall"
+    },
+    "WALL_A003": {
+      "id": "WALL_A003",
+      "layer": "03_WALL",
+      "category": "wall"
+    },
+    "WALL_A007": {
+      "id": "WALL_A007",
+      "layer": "03_WALL",
+      "category": "wall"
+    },
+    "FURNITURE009": {
+      "id": "FURNITURE009",
+      "layer": "06_FURNITURE",
+      "category": "furniture"
+    },
+    "BEAM002": {
+      "id": "BEAM002",
+      "layer": "01_STRUCTURE",
+      "category": "structure"
+    },
+    "FURNITURE002": {
+      "id": "FURNITURE002",
+      "layer": "06_FURNITURE",
+      "category": "furniture"
+    },
+    "COLUMN001": {
+      "id": "COLUMN001",
+      "layer": "01_STRUCTURE",
+      "category": "structure"
+    },
+    "BEAM001": {
+      "id": "BEAM001",
+      "layer": "01_STRUCTURE",
+      "category": "structure"
+    },
+    "FLOOR001": {
+      "id": "FLOOR001",
+      "layer": "02_FLOOR",
+      "category": "floor"
+    },
+    "WALL_A002": {
+      "id": "WALL_A002",
+      "layer": "03_WALL",
+      "category": "wall"
+    },
+    "DOOR001": {
+      "id": "DOOR001",
+      "layer": "05_OPENING",
+      "category": "opening"
+    },
+    "DOOR003": {
+      "id": "DOOR003",
+      "layer": "05_OPENING",
+      "category": "opening"
+    },
+    "DOOR002": {
+      "id": "DOOR002",
+      "layer": "05_OPENING",
+      "category": "opening"
+    }
+  }
+}

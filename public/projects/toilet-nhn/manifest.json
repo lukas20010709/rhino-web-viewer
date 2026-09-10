@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "1.0.0",
+  "project": "toilet-nhn",
+  "revision": "2026-09-10-v4",
+  "unit": "mm",
+  "up": "Y",
+  "origin": "origin.json",
+  "metadata": "metadata.json",
+  "thumbnail": "thumbnail.webp",
+  "parts": [
+    {
+      "id": "structure",
+      "file": "structure.glb",
+      "loadPriority": 2,
+      "defaultVisible": true
+    },
+    {
+      "id": "architecture",
+      "file": "architecture.glb",
+      "loadPriority": 3,
+      "defaultVisible": true
+    },
+    {
+      "id": "furniture",
+      "file": "furniture.glb",
+      "loadPriority": 4,
+      "defaultVisible": false
+    },
+    {
+      "id": "equipment",
+      "file": "equipment.glb",
+      "loadPriority": 5,
+      "defaultVisible": false
+    }
+  ]
+}
