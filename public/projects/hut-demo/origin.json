@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1.0.0",
+  "worldOrigin": {
+    "x": 46280500,
+    "y": 8141300,
+    "z": -250
+  },
+  "rotation": {
+    "x": 0,
+    "y": 0,
+    "z": 0
+  },
+  "unit": "mm",
+  "epsg": 6677
+}

@@ -1,0 +1,104 @@
+{
+  "schemaVersion": "1.0.0",
+  "project": "hut-demo",
+  "revision": "2026-09-10-hut-v1",
+  "objects": {
+    "TREE_001": {
+      "id": "TREE_001",
+      "status": "design",
+      "layer": "09_LANDSCAPE",
+      "category": "landscape"
+    },
+    "TANK_001": {
+      "id": "TANK_001",
+      "material": "plastic",
+      "status": "design",
+      "layer": "08_EQUIPMENT",
+      "category": "equipment"
+    },
+    "LAMP_001": {
+      "id": "LAMP_001",
+      "material": "metal",
+      "status": "design",
+      "layer": "07_LIGHTING",
+      "category": "lighting"
+    },
+    "TABLE_001": {
+      "id": "TABLE_001",
+      "material": "oak",
+      "status": "design",
+      "layer": "06_FURNITURE",
+      "category": "furniture"
+    },
+    "WINDOW_001": {
+      "id": "WINDOW_001",
+      "material": "glass",
+      "status": "design",
+      "layer": "05_OPENING",
+      "category": "opening"
+    },
+    "DOOR_001": {
+      "id": "DOOR_001",
+      "material": "wood",
+      "status": "design",
+      "layer": "05_OPENING",
+      "category": "opening"
+    },
+    "ROOF_001": {
+      "id": "ROOF_001",
+      "material": "steel_sheet",
+      "status": "design",
+      "layer": "04_CEILING",
+      "category": "ceiling"
+    },
+    "WALL_A004": {
+      "id": "WALL_A004",
+      "material": "plaster",
+      "status": "design",
+      "layer": "03_WALL",
+      "category": "wall"
+    },
+    "WALL_A003": {
+      "id": "WALL_A003",
+      "material": "plaster",
+      "status": "design",
+      "layer": "03_WALL",
+      "category": "wall"
+    },
+    "WALL_A002": {
+      "id": "WALL_A002",
+      "material": "plaster",
+      "status": "design",
+      "layer": "03_WALL",
+      "category": "wall"
+    },
+    "WALL_A001": {
+      "id": "WALL_A001",
+      "material": "plaster",
+      "status": "design",
+      "layer": "03_WALL",
+      "category": "wall"
+    },
+    "FLOOR_001": {
+      "id": "FLOOR_001",
+      "material": "concrete",
+      "status": "design",
+      "layer": "02_FLOOR",
+      "category": "floor"
+    },
+    "COL_001": {
+      "id": "COL_001",
+      "material": "timber",
+      "status": "design",
+      "layer": "01_STRUCTURE",
+      "category": "structure"
+    },
+    "SITE_001": {
+      "id": "SITE_001",
+      "material": "gravel",
+      "status": "design",
+      "layer": "00_SITE",
+      "category": "site"
+    }
+  }
+}

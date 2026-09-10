@@ -11,3 +11,4 @@ public/projects/project-a/*.glb
 public/decoders/
 # 実クライアント案件データを使ったローカル動作確認用プロジェクト（非公開・コミット禁止）
 public/projects/sala-trial/
+public/projects/sala-trial-v2/
