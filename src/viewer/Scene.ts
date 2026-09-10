@@ -146,6 +146,24 @@ export class Scene {
     return bounds;
   }
 
+  /**
+   * 断面平面（法線は常にX/Y/Zいずれかに平行）を覆うキャップの一辺サイズを、
+   * その法線軸を除いた残り2軸方向の可視ジオメトリの広がりから決める。
+   * 3軸すべての対角線を使うと、平面と無関係な奥行き方向の広がり
+   * （例: X軸断面なのにX方向にだけ長い敷地/外構）までサイズに乗ってしまう。
+   */
+  private capSizeForNormal(bounds: THREE.Box3, normal: THREE.Vector3): number {
+    const size = bounds.getSize(new THREE.Vector3());
+    const axisSizes = [size.x, size.y, size.z];
+    const dominant = [Math.abs(normal.x), Math.abs(normal.y), Math.abs(normal.z)].reduce(
+      (best, v, i, arr) => (v > arr[best] ? i : best),
+      0,
+    );
+    const footprint = axisSizes.filter((_, i) => i !== dominant);
+    const footprintDiagonal = Math.hypot(footprint[0], footprint[1]);
+    return Math.max(footprintDiagonal * 1.5, 1);
+  }
+
   private rebuildClipCaps(planes: THREE.Plane[]): void {
     if (planes.length === 0) {
       this.clipCapPool.forEach((mesh) => (mesh.visible = false));
@@ -160,18 +178,22 @@ export class Scene {
       this.clipCapPool.forEach((mesh) => (mesh.visible = false));
       return;
     }
-    const size = bounds.getSize(new THREE.Vector3()).length();
-    const planeSize = Math.max(size * 1.5, 1);
-    this.clipCapPool.forEach((mesh) => mesh.scale.set(planeSize, planeSize, 1));
     this.clipCenter.copy(bounds.getCenter(new THREE.Vector3()));
+    const overallDiagonal = bounds.getSize(new THREE.Vector3()).length();
+    const epsilon = Math.max(overallDiagonal * 0.0015, 0.001);
 
     const up = new THREE.Vector3(0, 0, 1);
-    const epsilon = this.clipCapPool[0].scale.x * 0.001;
     planes.forEach((plane, i) => {
       if (i >= this.clipCapPool.length) return;
       const mesh = this.clipCapPool[i];
       const normal = plane.normal.clone().normalize();
       mesh.quaternion.setFromUnitVectors(up, normal);
+      // 平面は常に軸に平行（Clipping.tsのAXIS_UNIT）。断面に無関係な奥行き方向の
+      // 広がりまで含めて一律の3D対角線でサイズ決めすると、site/landscape等の
+      // 遠い場所にあるジオメトリのぶんだけ不必要に肥大化する。法線が向く軸を除いた
+      // 残り2軸の広がりだけをキャップの覆う範囲として使う。
+      const planeSize = this.capSizeForNormal(bounds, normal);
+      mesh.scale.set(planeSize, planeSize, 1);
 
       const distance = plane.distanceToPoint(this.clipCenter);
       const point = this.clipCenter
