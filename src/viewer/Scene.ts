@@ -29,7 +29,6 @@ export class Scene {
   private readonly clipCapPool: THREE.Mesh[] = [];
   private clipCapMaterialProbe: THREE.Material | null = null;
   private clipPlanesRef: THREE.Plane[] | null = null;
-  private clipBoundsReady = false;
   private readonly clipCenter = new THREE.Vector3();
 
   constructor(canvas: HTMLCanvasElement) {
@@ -127,26 +126,44 @@ export class Scene {
     return found;
   }
 
+  /**
+   * 現在「実際に描画されている」ジオメトリの境界を計算する。
+   * THREE.Box3.setFromObject/expandByObject は visible フラグを見ないため、
+   * 非表示のpart（家具・設備など defaultVisible:false や、ユーザーが隠したpart）を
+   * 含めたまま境界を計算してしまい、断面キャップが不必要に巨大化する原因になっていた。
+   * scene.traverseVisible は visible===false のサブツリーへ descend しないため、
+   * 実際に見えている範囲だけを対象にできる。
+   */
+  private computeVisibleBounds(): THREE.Box3 {
+    const bounds = new THREE.Box3();
+    this.clipCapGroup.visible = false;
+    this.scene.traverseVisible((obj) => {
+      const mesh = obj as THREE.Mesh;
+      if (!mesh.isMesh || !mesh.geometry) return;
+      bounds.expandByObject(mesh, false);
+    });
+    this.clipCapGroup.visible = true;
+    return bounds;
+  }
+
   private rebuildClipCaps(planes: THREE.Plane[]): void {
     if (planes.length === 0) {
       this.clipCapPool.forEach((mesh) => (mesh.visible = false));
       return;
     }
 
-    if (!this.clipBoundsReady) {
-      this.scene.remove(this.clipCapGroup);
-      const bounds = new THREE.Box3().setFromObject(this.scene);
-      this.scene.add(this.clipCapGroup);
-      if (bounds.isEmpty()) {
-        this.clipCapPool.forEach((mesh) => (mesh.visible = false));
-        return;
-      }
-      const size = bounds.getSize(new THREE.Vector3()).length();
-      const planeSize = Math.max(size * 1.5, 1);
-      this.clipCapPool.forEach((mesh) => mesh.scale.set(planeSize, planeSize, 1));
-      this.clipCenter.copy(bounds.getCenter(new THREE.Vector3()));
-      this.clipBoundsReady = true;
+    // 現在表示中のジオメトリのみを対象に境界を再計算する（非表示パーツ・オブジェクトは除外）。
+    // 呼び出しごとに再計算するのは、有効な断面平面の集合が変わるたびであり（毎フレームではない）、
+    // 表示状態の変化にも追従できるようキャッシュしない。
+    const bounds = this.computeVisibleBounds();
+    if (bounds.isEmpty()) {
+      this.clipCapPool.forEach((mesh) => (mesh.visible = false));
+      return;
     }
+    const size = bounds.getSize(new THREE.Vector3()).length();
+    const planeSize = Math.max(size * 1.5, 1);
+    this.clipCapPool.forEach((mesh) => mesh.scale.set(planeSize, planeSize, 1));
+    this.clipCenter.copy(bounds.getCenter(new THREE.Vector3()));
 
     const up = new THREE.Vector3(0, 0, 1);
     const epsilon = this.clipCapPool[0].scale.x * 0.001;
