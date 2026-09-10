@@ -1,21 +1,18 @@
 import * as THREE from 'three';
 
-const CLIP_CAP_COLOR = 0xaaaaaa;
-const CLIP_CAP_POOL_SIZE = 3;
-
 /**
  * Three.jsのシーン・レンダラ・ライト・レンダループを管理する。
  * 責務: 描画基盤の生成と毎フレーム更新。モデルの中身やUIは知らない。
  * 参照: docs/viewer-design.md §2
  *
- * 断面カット面のフィル表示（Clipping Cap）:
- * Clipping.ts はマテリアルの clippingPlanes を書き換えるだけで Scene を参照しない設計。
- * main.ts側の呼び出し方を変えずに連携するため、Scene側は
- * 「登録済みマテリアルは（0枚でも）常に clippingPlanes 配列を持つ」という
- * Clipping.apply() の契約を手がかりに、シーングラフから代表マテリアルを1つ見つけ、
- * その配列参照の変化を検知して断面を塗りつぶす平面メッシュを同期する。
- * 制約: 実ジオメトリのステンシル断面ではなく近似（モデル境界サイズの単色平面、
- * 他の有効平面でクリップ）のため、実際の断面形状より広い範囲が塗りつぶされ得る。
+ * 断面（Clipping）は Clipping.ts が登録済みマテリアルの clippingPlanes を
+ * 直接書き換えるだけで実現する（renderer.localClippingEnabled=true、以下で設定）。
+ * 過去に断面キャップ（切断面を塗りつぶす近似平面）を追加したことがあったが、
+ * モデル境界サイズの単色平面をそのままキャップとして描画する実装だったため、
+ * 実際の断面形状（中空/非中空の区別）を反映できず、壁の内側等の空洞部分まで
+ * 塗りつぶして中が見えなくなる問題があった。正しい断面キャップにはステンシル
+ * バッファ等を用いた実ジオメトリ形状のキャップ描画が必要で、単純な単色平面では
+ * 実現できないため撤去し、素のクリッピング（中空部分は見えたまま）に戻した。
  */
 export class Scene {
   readonly scene = new THREE.Scene();
@@ -23,13 +20,6 @@ export class Scene {
   private readonly clock = new THREE.Clock();
   private onUpdate: ((dt: number) => void) | null = null;
   private running = false;
-
-  private readonly clipCapGroup = new THREE.Group();
-  private readonly clipCapGeometry = new THREE.PlaneGeometry(1, 1);
-  private readonly clipCapPool: THREE.Mesh[] = [];
-  private clipCapMaterialProbe: THREE.Material | null = null;
-  private clipPlanesRef: THREE.Plane[] | null = null;
-  private readonly clipCenter = new THREE.Vector3();
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -43,25 +33,6 @@ export class Scene {
     const dir = new THREE.DirectionalLight(0xffffff, 1.2);
     dir.position.set(1, 2, 1);
     this.scene.add(dir);
-
-    this.clipCapGroup.name = '__clipCapGroup';
-    for (let i = 0; i < CLIP_CAP_POOL_SIZE; i++) {
-      const material = new THREE.MeshStandardMaterial({
-        color: CLIP_CAP_COLOR,
-        side: THREE.DoubleSide,
-        roughness: 0.9,
-        metalness: 0,
-        polygonOffset: true,
-        polygonOffsetFactor: -4,
-        polygonOffsetUnits: -4,
-      });
-      const mesh = new THREE.Mesh(this.clipCapGeometry, material);
-      mesh.name = `__clipCap${i}`;
-      mesh.visible = false;
-      this.clipCapPool.push(mesh);
-      this.clipCapGroup.add(mesh);
-    }
-    this.scene.add(this.clipCapGroup);
 
     window.addEventListener('resize', () => this.resize());
     this.resize();
@@ -80,7 +51,6 @@ export class Scene {
       if (!this.running) return;
       const dt = this.clock.getDelta();
       this.onUpdate?.(dt);
-      this.syncClipCaps();
       this.renderer.render(this.scene, getCamera());
       requestAnimationFrame(loop);
     };
@@ -97,118 +67,5 @@ export class Scene {
     const w = clientWidth || window.innerWidth;
     const h = clientHeight || window.innerHeight;
     this.renderer.setSize(w, h, false);
-  }
-
-  /** 現在有効なclippingPlanes配列（参照）の変化を検知し、断面キャップを再同期する */
-  private syncClipCaps(): void {
-    if (!this.clipCapMaterialProbe) {
-      this.clipCapMaterialProbe = this.findRegisteredMaterial();
-      if (!this.clipCapMaterialProbe) return;
-    }
-
-    const planes = (this.clipCapMaterialProbe.clippingPlanes as THREE.Plane[] | null) ?? [];
-    if (planes === this.clipPlanesRef) return;
-    this.clipPlanesRef = planes;
-    this.rebuildClipCaps(planes);
-  }
-
-  /** Clipping.registerMaterials()経由でclippingPlanesが設定済みの代表マテリアルを1つ探す */
-  private findRegisteredMaterial(): THREE.Material | null {
-    let found: THREE.Material | null = null;
-    this.scene.traverse((obj) => {
-      if (found || obj === this.clipCapGroup || this.clipCapGroup.children.includes(obj)) return;
-      const mesh = obj as THREE.Mesh;
-      if (!mesh.isMesh) return;
-      const material = mesh.material as THREE.Material | THREE.Material[];
-      const m = Array.isArray(material) ? material[0] : material;
-      if (m && Array.isArray(m.clippingPlanes)) found = m;
-    });
-    return found;
-  }
-
-  /**
-   * 現在「実際に描画されている」ジオメトリの境界を計算する。
-   * THREE.Box3.setFromObject/expandByObject は visible フラグを見ないため、
-   * 非表示のpart（家具・設備など defaultVisible:false や、ユーザーが隠したpart）を
-   * 含めたまま境界を計算してしまい、断面キャップが不必要に巨大化する原因になっていた。
-   * scene.traverseVisible は visible===false のサブツリーへ descend しないため、
-   * 実際に見えている範囲だけを対象にできる。
-   */
-  private computeVisibleBounds(): THREE.Box3 {
-    const bounds = new THREE.Box3();
-    this.clipCapGroup.visible = false;
-    this.scene.traverseVisible((obj) => {
-      const mesh = obj as THREE.Mesh;
-      if (!mesh.isMesh || !mesh.geometry) return;
-      bounds.expandByObject(mesh, false);
-    });
-    this.clipCapGroup.visible = true;
-    return bounds;
-  }
-
-  /**
-   * 断面平面（法線は常にX/Y/Zいずれかに平行）を覆うキャップの一辺サイズを、
-   * その法線軸を除いた残り2軸方向の可視ジオメトリの広がりから決める。
-   * 3軸すべての対角線を使うと、平面と無関係な奥行き方向の広がり
-   * （例: X軸断面なのにX方向にだけ長い敷地/外構）までサイズに乗ってしまう。
-   */
-  private capSizeForNormal(bounds: THREE.Box3, normal: THREE.Vector3): number {
-    const size = bounds.getSize(new THREE.Vector3());
-    const axisSizes = [size.x, size.y, size.z];
-    const dominant = [Math.abs(normal.x), Math.abs(normal.y), Math.abs(normal.z)].reduce(
-      (best, v, i, arr) => (v > arr[best] ? i : best),
-      0,
-    );
-    const footprint = axisSizes.filter((_, i) => i !== dominant);
-    const footprintDiagonal = Math.hypot(footprint[0], footprint[1]);
-    return Math.max(footprintDiagonal * 1.5, 1);
-  }
-
-  private rebuildClipCaps(planes: THREE.Plane[]): void {
-    if (planes.length === 0) {
-      this.clipCapPool.forEach((mesh) => (mesh.visible = false));
-      return;
-    }
-
-    // 現在表示中のジオメトリのみを対象に境界を再計算する（非表示パーツ・オブジェクトは除外）。
-    // 呼び出しごとに再計算するのは、有効な断面平面の集合が変わるたびであり（毎フレームではない）、
-    // 表示状態の変化にも追従できるようキャッシュしない。
-    const bounds = this.computeVisibleBounds();
-    if (bounds.isEmpty()) {
-      this.clipCapPool.forEach((mesh) => (mesh.visible = false));
-      return;
-    }
-    this.clipCenter.copy(bounds.getCenter(new THREE.Vector3()));
-    const overallDiagonal = bounds.getSize(new THREE.Vector3()).length();
-    const epsilon = Math.max(overallDiagonal * 0.0015, 0.001);
-
-    const up = new THREE.Vector3(0, 0, 1);
-    planes.forEach((plane, i) => {
-      if (i >= this.clipCapPool.length) return;
-      const mesh = this.clipCapPool[i];
-      const normal = plane.normal.clone().normalize();
-      mesh.quaternion.setFromUnitVectors(up, normal);
-      // 平面は常に軸に平行（Clipping.tsのAXIS_UNIT）。断面に無関係な奥行き方向の
-      // 広がりまで含めて一律の3D対角線でサイズ決めすると、site/landscape等の
-      // 遠い場所にあるジオメトリのぶんだけ不必要に肥大化する。法線が向く軸を除いた
-      // 残り2軸の広がりだけをキャップの覆う範囲として使う。
-      const planeSize = this.capSizeForNormal(bounds, normal);
-      mesh.scale.set(planeSize, planeSize, 1);
-
-      const distance = plane.distanceToPoint(this.clipCenter);
-      const point = this.clipCenter
-        .clone()
-        .sub(normal.clone().multiplyScalar(distance))
-        .add(normal.clone().multiplyScalar(epsilon));
-      mesh.position.copy(point);
-
-      const others = planes.filter((_, j) => j !== i);
-      (mesh.material as THREE.Material).clippingPlanes = others;
-      mesh.visible = true;
-    });
-
-    for (let i = planes.length; i < this.clipCapPool.length; i++) {
-      this.clipCapPool[i].visible = false;
-    }
   }
 }
