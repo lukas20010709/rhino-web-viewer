@@ -1,17 +1,17 @@
 {
   "schemaVersion": "1.0.0",
   "project": "toilet-nhn",
-  "revision": "2026-09-10-v4",
+  "revision": "2026-09-11-v1",
   "objects": {
+    "FURNITURE012": {
+      "id": "FURNITURE012",
+      "layer": "06_FURNITURE",
+      "category": "furniture"
+    },
     "EQUIPMENT005": {
       "id": "EQUIPMENT005",
       "layer": "08_EQUIPMENT",
       "category": "equipment"
-    },
-    "FURNITURE001": {
-      "id": "FURNITURE001",
-      "layer": "06_FURNITURE",
-      "category": "furniture"
     },
     "EQUIPMENT007": {
       "id": "EQUIPMENT007",
