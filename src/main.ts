@@ -7,6 +7,7 @@ import { Selection } from './viewer/Selection';
 import { Layers } from './viewer/Layers';
 import { Clipping } from './viewer/Clipping';
 import { ClipStencil } from './viewer/ClipStencil';
+import { DisplayStyle, type DisplayStyleMode } from './viewer/DisplayStyle';
 import { ModelTree } from './ui/ModelTree';
 import { PropertyPanel } from './ui/PropertyPanel';
 import { ClippingPanel } from './ui/ClippingPanel';
@@ -58,8 +59,96 @@ function hideLoading(): void {
   loadingEl = null;
 }
 
+interface ProjectIndexEntry {
+  id: string;
+  title: string;
+}
+
+interface ProjectIndex {
+  projects: ProjectIndexEntry[];
+}
+
 /**
- * 起動エントリ。各モジュールを結線し、URLパラメータを解釈する。
+ * ?project= 未指定時のホーム画面。公開プロジェクト一覧（静的に管理された
+ * public/projects/index.json、動的なディレクトリ探索はしない）を取得し、
+ * カードクリックで ?project=<id> に遷移する。
+ */
+async function renderHome(): Promise<void> {
+  // ビューワ用の既存パネル（loadViewerが中身を組み立てる前提）は、ホーム画面では
+  // 空のまま表示されてしまう（padding分の空箱が見える）ため、ここで明示的に隠す。
+  for (const id of ['tree', 'props', 'clip', 'scalebar', 'toolbar']) {
+    const el = document.getElementById(id);
+    if (el) el.hidden = true;
+  }
+
+  const panel = document.createElement('aside');
+  panel.className = 'panel home-panel';
+  panel.setAttribute('aria-label', 'プロジェクト一覧');
+
+  const heading = document.createElement('h1');
+  heading.textContent = 'Rhino Web Viewer';
+  panel.appendChild(heading);
+
+  const sub = document.createElement('p');
+  sub.className = 'home-sub';
+  sub.textContent = '閲覧するプロジェクトを選択してください';
+  panel.appendChild(sub);
+
+  const list = document.createElement('div');
+  list.className = 'home-list';
+  panel.appendChild(list);
+
+  document.body.appendChild(panel);
+
+  try {
+    const res = await fetch(`${import.meta.env.BASE_URL}projects/index.json`);
+    if (!res.ok) throw new Error(`fetch failed: projects/index.json (${res.status})`);
+    const index = (await res.json()) as ProjectIndex;
+
+    if (index.projects.length === 0) {
+      const empty = document.createElement('p');
+      empty.textContent = '公開中のプロジェクトはありません。';
+      list.appendChild(empty);
+      return;
+    }
+
+    for (const entry of index.projects) {
+      const card = document.createElement('div');
+      card.className = 'home-card';
+      card.setAttribute('role', 'button');
+      card.tabIndex = 0;
+
+      const title = document.createElement('div');
+      title.className = 'home-card-title';
+      title.textContent = entry.title;
+      card.appendChild(title);
+
+      const open = (): void => {
+        const url = new URL(location.href);
+        url.searchParams.set('project', entry.id);
+        location.href = url.toString();
+      };
+      card.addEventListener('click', open);
+      card.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          open();
+        }
+      });
+
+      list.appendChild(card);
+    }
+  } catch (err) {
+    console.error('[viewer] failed to load project index:', err);
+    const message = err instanceof Error ? err.message : String(err);
+    const error = document.createElement('p');
+    error.textContent = `プロジェクト一覧の取得に失敗しました: ${message}`;
+    list.appendChild(error);
+  }
+}
+
+/**
+ * 単一プロジェクトのビューワ本体。各モジュールを結線し、URLパラメータを解釈する。
  * 参照: docs/viewer-design.md §2/§3/§4/§7
  *
  * Phase 1 MVP UI を組み上げる:
@@ -70,11 +159,11 @@ function hideLoading(): void {
  *   - キーボード         : Esc（選択解除）/ F（Fit）/ H（Hide）/ I（Isolate）/ R（Reset）
  *
  * URL例:
- *   ?project=project-a          対象プロジェクト（既定 project-a）
+ *   ?project=project-a          対象プロジェクト
  *   ?mode=3dm                   Debug/Internalの3DM直読（章37, 未実装フック）
  *   将来: ?camera=&layer=&object=（Phase 5 Camera URL Sharing）
  */
-async function main(): Promise<void> {
+async function loadViewer(project: string): Promise<void> {
   showLoading();
 
   const canvas = document.getElementById('viewer') as HTMLCanvasElement;
@@ -85,7 +174,6 @@ async function main(): Promise<void> {
   const scalebarEl = document.getElementById('scalebar') as HTMLElement;
 
   const params = new URLSearchParams(location.search);
-  const project = params.get('project') ?? 'project-a';
   const mode = params.get('mode'); // 'gltf'(既定) | '3dm'(debug)
 
   if (mode === '3dm') {
@@ -195,6 +283,10 @@ async function main(): Promise<void> {
     return btn;
   };
 
+  addButton('ホームに戻る', () => {
+    location.href = import.meta.env.BASE_URL;
+  });
+
   addButton('全体表示', () => setView('perspective'));
   addButton('上面', () => setView('top'));
   addButton('正面', () => setView('front'));
@@ -242,6 +334,42 @@ async function main(): Promise<void> {
       });
   });
 
+  // --- 表示スタイル（通常/ワイヤーフレーム/Xレイ/モノクロ） -----------------
+  const displayStyle = new DisplayStyle();
+  const styleModes: { mode: DisplayStyleMode; label: string }[] = [
+    { mode: 'normal', label: '通常' },
+    { mode: 'wireframe', label: 'ワイヤーフレーム' },
+    { mode: 'xray', label: 'Xレイ' },
+    { mode: 'monochrome', label: 'モノクロ' },
+  ];
+  const styleButtons = new Map<DisplayStyleMode, HTMLButtonElement>();
+
+  const setStyleMode = (mode: DisplayStyleMode): void => {
+    displayStyle.apply(modelLoader.partRoots.values(), mode);
+    for (const [m, btn] of styleButtons) btn.setAttribute('aria-pressed', String(m === mode));
+  };
+
+  for (const { mode, label } of styleModes) {
+    styleButtons.set(mode, addButton(label, () => setStyleMode(mode)));
+  }
+  setStyleMode('normal'); // 既定は通常表示（起動直後は見た目に変化なし）
+
+  addButton('スクリーンショット', () => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        console.error('[viewer] screenshot failed: toBlob returned null');
+        return;
+      }
+      const timestamp = new Date().toISOString().replace(/:/g, '-').replace(/\.\d+Z$/, 'Z');
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${project}_${timestamp}.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }, 'image/png');
+  });
+
   // --- 選択（Click）→ Property Panel ---------------------------------------
   canvas.addEventListener('pointerdown', (e) => {
     const rect = canvas.getBoundingClientRect();
@@ -286,6 +414,18 @@ async function main(): Promise<void> {
     clipStencil.update(clipping.getActivePlanes());
   });
   console.log(`[viewer] loaded ${project} rev=${data.manifest.revision}`);
+}
+
+async function main(): Promise<void> {
+  const params = new URLSearchParams(location.search);
+  const project = params.get('project');
+
+  if (!project) {
+    await renderHome();
+    return;
+  }
+
+  await loadViewer(project);
 }
 
 main().catch((err) => {

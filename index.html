@@ -28,7 +28,9 @@
       #props table { border-collapse: collapse; width: 100%; }
       #props th { text-align: left; color: #5b6470; font-weight: 600; padding: 2px 8px 2px 0; vertical-align: top; white-space: nowrap; }
       #props td { padding: 2px 0; word-break: break-word; }
-      #toolbar {
+      /* #scalebarと同じ理由（IDセレクタのdisplay指定が[hidden]を上書きする）で
+         :not([hidden])に限定する。ホーム画面表示時にtoolbarをhiddenにする際に必要。 */
+      #toolbar:not([hidden]) {
         left: 50%; bottom: 14px; transform: translateX(-50%);
         display: flex; gap: 4px; padding: 6px;
       }
@@ -40,7 +42,10 @@
       #toolbar button[aria-pressed="true"] { background: #1c2126; color: #fff; border-color: #1c2126; }
       #clip { left: 12px; bottom: 14px; padding: 10px 12px; min-width: 240px; }
       /* 平行投影時のみ表示するスケールバー（右下）。 */
-      #scalebar { right: 12px; bottom: 14px; padding: 8px 12px; display: flex; align-items: center; gap: 8px; }
+      /* IDセレクタはUAスタイルの[hidden]{display:none}より詳細度が高く、display指定が
+         あるとhidden属性を上書きしてしまう（非表示時も小さな空箱が常時表示・操作可能に
+         なっていた）。:not([hidden])に限定してhidden時はUAスタイル側に委ねる。 */
+      #scalebar:not([hidden]) { right: 12px; bottom: 14px; padding: 8px 12px; display: flex; align-items: center; gap: 8px; }
       #scalebar .scalebar-bar { height: 6px; border-left: 2px solid #1c2126; border-right: 2px solid #1c2126; border-bottom: 2px solid #1c2126; }
       #scalebar .scalebar-label { font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
       #clip .clip-row { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
@@ -51,6 +56,24 @@
         background: #fff; border-radius: 4px; cursor: pointer; color: #1c2126;
       }
       #clip .clip-row button:hover { background: #eef1f4; }
+
+      /* ホーム画面（?project=未指定時）: プロジェクト選択カード一覧。 */
+      .home-panel {
+        top: 50%; left: 50%; transform: translate(-50%, -50%);
+        width: min(420px, calc(100vw - 32px));
+        max-height: 80vh; overflow: auto;
+        padding: 20px 24px;
+        text-align: center;
+      }
+      .home-panel h1 { margin: 0 0 4px; font-size: 18px; }
+      .home-panel .home-sub { margin: 0 0 16px; font-size: 12px; color: #5b6470; }
+      .home-list { display: flex; flex-direction: column; gap: 8px; text-align: left; }
+      .home-card {
+        border: 1px solid #c3c7cd; border-radius: 6px; padding: 10px 12px;
+        cursor: pointer; background: #fff;
+      }
+      .home-card:hover { background: #eef1f4; }
+      .home-card-title { font-weight: 600; }
 
       /* 狭幅ビューポート(スマートフォン等)向けレイアウト調整。パネル構成・配置概念は維持し、重なり/はみ出しのみ解消する。 */
       @media (max-width: 600px) {

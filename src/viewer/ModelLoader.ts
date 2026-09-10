@@ -106,8 +106,16 @@ export class ModelLoader {
       if (!(node instanceof THREE.Mesh)) return;
       const material = node.material;
       if (material instanceof THREE.MeshStandardMaterial) {
-        material.metalness = 0;
-        material.roughness = 0.9;
+        // metalness=1 かつ roughness=1 かつ テクスチャなしは glTF既定値そのもの
+        // （Rhino側でPBRマテリアルを明示指定していないオブジェクト＝カテゴリ自動配色の
+        // フォールバックだけが該当する。Rhinoで明示的に設定した実際のPBRマテリアルは
+        // 通常この組み合わせにはならないため、ここでは既定値のときだけ救済し、
+        // 実マテリアルの値はそのまま尊重する）。
+        const isUntouchedGltfDefault = material.metalness === 1 && material.roughness === 1 && !material.map;
+        if (isUntouchedGltfDefault) {
+          material.metalness = 0;
+          material.roughness = 0.9;
+        }
       }
       // mergeVerticesは新しいBufferGeometryを返す。EdgesGeometryや後続の
       // ClipStencil.registerMesh（main.tsでloadAll完了後に呼ばれる）が溶接後の

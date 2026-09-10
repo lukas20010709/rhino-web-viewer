@@ -22,7 +22,12 @@ export class Scene {
 
   constructor(canvas: HTMLCanvasElement) {
     // stencil: true はステンシルバッファを使う断面キャップ（ClipStencil.ts）に必要。
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, stencil: true });
+    // preserveDrawingBuffer: true はスクリーンショット機能（canvas.toBlob）のため。
+    // 既定(false)だとブラウザが描画直後にバッファを破棄し得るため、rAFループの
+    // 外側（クリックハンドラ）から確実に最終フレームを読み取れるようにする。
+    // 小規模モデルが対象でパフォーマンス影響は許容範囲のため、バッファ保持の
+    // 簡便さを優先する。
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, stencil: true, preserveDrawingBuffer: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     // Clipping（Section基盤 / Phase 4）を有効化しておく。
