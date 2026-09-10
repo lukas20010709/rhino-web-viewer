@@ -19,6 +19,53 @@ import * as THREE from 'three';
  * 凸形状（本ビューアーの壁/床/屋根等の単純な箱形状）を前提とした実装。
  */
 
+/**
+ * 断面キャップのハッチングテクスチャ生成。
+ * 建築断面図の慣習（45度斜線ハッチング）に倣い、部材色から地色と線色を導出する。
+ * 同じ色のメッシュ間でCanvas生成を使い回すため色ごとにキャッシュし、
+ * キャップごとに異なる繰り返し数（実寸スケールに揃えるため）だけを
+ * clone()したTextureに個別設定する。
+ */
+const HATCH_CANVAS_SIZE = 64;
+const HATCH_LINE_SPACING_PX = 8;
+const HATCH_LINE_WIDTH_PX = 2;
+/** ハッチ線1本あたりの実寸間隔(m)。キャップの大小に関わらず密度を揃える。 */
+const HATCH_WORLD_SPACING = 0.25;
+
+const hatchTextureCache = new Map<string, THREE.CanvasTexture>();
+
+function getBaseHatchTexture(color: THREE.Color): THREE.CanvasTexture {
+  const key = color.getHexString();
+  const cached = hatchTextureCache.get(key);
+  if (cached) return cached;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = HATCH_CANVAS_SIZE;
+  canvas.height = HATCH_CANVAS_SIZE;
+  const ctx = canvas.getContext('2d')!;
+
+  const background = color.clone().lerp(new THREE.Color(0xffffff), 0.55);
+  ctx.fillStyle = `#${background.getHexString()}`;
+  ctx.fillRect(0, 0, HATCH_CANVAS_SIZE, HATCH_CANVAS_SIZE);
+
+  const line = color.clone().lerp(new THREE.Color(0x000000), 0.55);
+  ctx.strokeStyle = `#${line.getHexString()}`;
+  ctx.lineWidth = HATCH_LINE_WIDTH_PX;
+  for (let offset = -HATCH_CANVAS_SIZE; offset <= HATCH_CANVAS_SIZE * 2; offset += HATCH_LINE_SPACING_PX) {
+    ctx.beginPath();
+    ctx.moveTo(offset, 0);
+    ctx.lineTo(offset - HATCH_CANVAS_SIZE, HATCH_CANVAS_SIZE);
+    ctx.stroke();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  hatchTextureCache.set(key, texture);
+  return texture;
+}
+
 interface AxisSlot {
   maskBack: THREE.Mesh;
   maskFront: THREE.Mesh;
@@ -54,6 +101,12 @@ export class ClipStencil {
 
     const capColor = (material as THREE.MeshStandardMaterial).color?.clone() ?? new THREE.Color(0xcccccc);
     mesh.updateWorldMatrix(true, false);
+
+    // ハッチングの繰り返し数はメッシュごとに一定（キャップの実寸サイズはupdate()内の
+    // 計算と同じ式で、境界球はジオメトリ由来なので毎フレーム変わらない）。
+    mesh.geometry.computeBoundingSphere();
+    const capSize = Math.max((mesh.geometry.boundingSphere?.radius ?? 1) * 2.5, 0.05);
+    const hatchRepeat = Math.max(capSize / HATCH_WORLD_SPACING, 1);
 
     const slots: AxisSlot[] = [];
     for (let i = 0; i < MAX_SIMULTANEOUS_PLANES; i++) {
@@ -94,11 +147,17 @@ export class ClipStencil {
       maskBack.matrix.copy(mesh.matrixWorld);
       maskFront.matrix.copy(mesh.matrixWorld);
 
-      // キャップはメッシュ自身のマテリアル色を引き継ぐ。ステンシルが「一致した
-      // ピクセルだけ描画し、直後にその値を0へ戻す」ため、他メッシュのグループと
-      // 明示的なバッファクリアなしで共存できる（描画順はrenderOrderで保証）。
+      // キャップはメッシュ自身のマテリアル色から生成したハッチングテクスチャを貼る
+      // （建築断面図の慣習に倣い、単色塗りつぶしではなく断面であることを示す）。
+      // ステンシルが「一致したピクセルだけ描画し、直後にその値を0へ戻す」ため、
+      // 他メッシュのグループと明示的なバッファクリアなしで共存できる
+      // （描画順はrenderOrderで保証）。
+      const capTexture = getBaseHatchTexture(capColor).clone();
+      capTexture.needsUpdate = true;
+      capTexture.repeat.set(hatchRepeat, hatchRepeat);
       const capMaterial = new THREE.MeshStandardMaterial({
         color: capColor,
+        map: capTexture,
         side: THREE.DoubleSide,
         roughness: 0.9,
         metalness: 0,

@@ -80,10 +80,21 @@ export class ModelLoader {
    * Selection.resolveObjectId は hitしたmeshからnode.parentを辿ってObject IDを
    * 解決するため、輪郭線自体がヒットしてしまうと親IDの解決を阻害しうる。
    * そのためLineSegments.raycastをno-opにして、Raycasterから常に除外する。
+   *
+   * 合わせて各メッシュのマテリアルを非金属寄りに補正する。RhinoのGLBエクスポートは
+   * metallicFactor/roughnessFactorを明示しないためglTF既定値(metalness=1,
+   * roughness=1)になり、環境マップ（未使用）がない本ビューアーでは面が
+   * ほぼ黒く沈んで見える（正反射しか出ないため）。建築/什器/設備等はいずれも
+   * 非金属の塗装面が実態に近いため、ここで一律補正する。
    */
   private addSilhouetteEdges(root: THREE.Object3D): void {
     root.traverse((node) => {
       if (!(node instanceof THREE.Mesh)) return;
+      const material = node.material;
+      if (material instanceof THREE.MeshStandardMaterial) {
+        material.metalness = 0;
+        material.roughness = 0.9;
+      }
       const edgesGeometry = new THREE.EdgesGeometry(node.geometry, ModelLoader.EDGE_THRESHOLD_ANGLE);
       const edges = new THREE.LineSegments(edgesGeometry, this.edgeMaterial);
       edges.name = `${node.name}__edges`;
