@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "project": "toilet-nhn",
-  "revision": "2026-09-11-v1",
+  "revision": "2026-09-11-v2",
   "objects": {
     "FURNITURE012": {
       "id": "FURNITURE012",
